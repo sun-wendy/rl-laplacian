@@ -48,6 +48,9 @@ class QLearningAgent:
         new_q = current_q + self.learning_rate * (reward + self.discount * max_next_q * (not done) - current_q)
         self.get_q_vals(state)[action] = new_q
 
+        return True
+
+
 class QLearningFixedOptions(object):
     """Q learning agent that learns from fixed options."""
     def __init__(self, options: Dict[str, Option], learning_rate=0.1, epsilon=0.1,
@@ -147,4 +150,9 @@ class SMDPQLearningAgent(QLearningFixedOptions):
             new_q = current_q + self.learning_rate * (reward + discount * max_next_q
                                                       * (not done) - current_q)
             self.get_q_vals(self.current_option_start_state)[self.current_option_idx] = new_q
+
+            return True
+
+        else:
+            return False
 
