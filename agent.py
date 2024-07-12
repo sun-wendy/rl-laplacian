@@ -50,8 +50,11 @@ class QLearningAgent:
 
         return True
 
+    def reset(self):
+        pass
 
-class QLearningFixedOptions(object):
+
+class QLearningFixedOptionsAgent(object):
     """Q learning agent that learns from fixed options."""
     def __init__(self, options: Dict[str, Option], learning_rate=0.1, epsilon=0.1,
                  q_initialisation=0.0, discount=0.99):
@@ -88,9 +91,12 @@ class QLearningFixedOptions(object):
     def _choose_option_idx(self, state: Tuple[int]) -> int:
         """Selects an option index according to epsilon-greedy policy"""
         if np.random.random() < self.epsilon:
-            return np.random.choice(self.n_options)
+            option_idx = np.random.choice(self.n_options)
         else:
-            return np.argmax(self.get_q_vals(state))
+            option_idx = np.argmax(self.get_q_vals(state))
+
+        print(f"Selecting option {self.option_names[option_idx]}...")
+        return option_idx
 
     def choose_action(self, state: Tuple[int]) -> int:
         """Select a base action from the option. Records the start state of the
@@ -99,6 +105,7 @@ class QLearningFixedOptions(object):
         # Select an option the current option is not defined, or has terminated
         if (self.current_option is None or
                 self.current_option.termination_condition(state)):
+            print("Choosing new option...")
             self.current_option_idx = self._choose_option_idx(state)
             self.current_option = self.options[self.current_option_idx]
 
@@ -112,22 +119,6 @@ class QLearningFixedOptions(object):
 
     def update(self, state: Tuple[int], action: int, reward: float,
                next_state: Tuple[int], done: bool):
-        """Define an update rule for the agent"""
-        pass
-
-
-class SMDPQLearningAgent(QLearningFixedOptions):
-    """Q learning agent that learns from fixed options. Learns the values of fixed
-    according to the SMDP learning update rule. Ref:
-     https://web.eecs.umich.edu/~baveja/Papers/ICML98_SPS.pdf"""
-    def __init__(self, options: Dict[str, Option], learning_rate=0.1, epsilon=0.1,
-                 q_initialisation=0.0, discount=0.99, discount_option_steps=False):
-        super().__init__(options, learning_rate, epsilon, q_initialisation, discount)
-
-        self.discount_option_steps = discount_option_steps
-
-    def update(self, state: Tuple[int], action: int, reward: float,
-               next_state: Tuple[int], done: bool):
         """Apply the SMDP Q learning update. Note that :state: is not used,
         since update() is called after every base action, but SMDP Q learning
         only applies an update from the state in which the option began.
@@ -138,21 +129,26 @@ class SMDPQLearningAgent(QLearningFixedOptions):
                 self.current_option_start_state is not None, "No option to update")
 
         # Only update the q values once the option has terminated
-        if self.current_option.termination_condition(next_state):
+        if self.current_option.termination_condition(next_state) or done:
             current_q = self.get_q_vals(self.current_option_start_state)[self.current_option_idx]
             max_next_q = np.max(self.get_q_vals(next_state))
 
-            if self.discount_option_steps:
-                discount = np.power(self.discount, self.current_option_steps)
-            else:
-                discount = self.discount
-
-            new_q = current_q + self.learning_rate * (reward + discount * max_next_q
+            new_q = current_q + self.learning_rate * (reward + self.discount *
+                                                      max_next_q
                                                       * (not done) - current_q)
             self.get_q_vals(self.current_option_start_state)[self.current_option_idx] = new_q
+
+            print("Done.")
 
             return True
 
         else:
             return False
+
+    def reset(self):
+        """Reset the options after every episode"""
+        self.current_option = None
+        self.current_option_idx = None
+        self.current_option_start_state = None
+        self.current_option_steps = 0
 

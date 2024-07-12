@@ -2,7 +2,7 @@
 
 import argparse
 import training
-from agent import QLearningAgent, SMDPQLearningAgent
+from agent import QLearningAgent, QLearningFixedOptionsAgent
 
 
 class Args:
@@ -12,7 +12,7 @@ class Args:
         self.parser = argparse.ArgumentParser(description="Command Line Arguments")
         # Agent settings
         self.parser.add_argument('--agent_class', type=str2agentclass,
-                                 default='QLearningAgent', choices=[QLearningAgent, SMDPQLearningAgent]),
+                                 default='QLearningAgent', choices= [QLearningFixedOptionsAgent, QLearningAgent]),
         self.parser.add_argument('--learning_rate', type=float,
                                  default=0.1, help='Learning rate for training')
         self.parser.add_argument('--discount', type=float, default=0.9,
@@ -31,8 +31,8 @@ class Args:
                                  choices=['one_room', 'four_rooms', 'i_maze',
                                           'two_rooms', 'three_rooms', 'hard_maze'],
                                  help='Environment name.')
-        self.parser.add_argument('--diffusion', type=str, default='None',
-                                 choices=['None', 'diffusion', 'random_walk'],
+        self.parser.add_argument('--diffusion', type=str, default='normalised',
+                                 choices=['None', 'normalised', 'random_walk'],
                                  help='Diffusion type for environment.')
         self.parser.add_argument('--max_steps', type=int, default=5_000,
                                  help='Maximum number of steps per episode.')
@@ -85,8 +85,8 @@ def str2agentclass(v):
     """Turns command line arguments into boolean values"""
     if v == "QLearningAgent":
         return QLearningAgent
-    elif v == "SMDPQLearningAgent":
-        return SMDPQLearningAgent
+    elif v == "QLearningFixedOptionsAgent":
+        return QLearningFixedOptionsAgent
     else:
         raise argparse.ArgumentTypeError(f'Unrecognized agent class: {v}.')
 
@@ -116,7 +116,7 @@ def run_experiment(args):
     # group for each run, and distinguish the runs within a group by their seeds
     if args.agent_class == QLearningAgent:
         group_name = f'{args.env_name}_{args.suffix}_no_options'
-    elif args.agent_class == SMDPQLearningAgent:
+    elif args.agent_class == QLearningFixedOptionsAgent:
         group_name = (f'{args.env_name}_{args.suffix}_{args.n_eigenoptions}_eigenoptions')
 
 

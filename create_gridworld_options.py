@@ -27,6 +27,7 @@ def plot_option(env: GridWorld, option: Option, suffix=''):
     plt.savefig(f'{suffix}.png')
     plt.close()
 
+
 def create_primitive_options(env: GridWorld, actions: List[IntEnum]) -> Dict[
     str, Option]:
     """Create primitive options from a list of actions"""

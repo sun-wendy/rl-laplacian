@@ -180,7 +180,7 @@ class GridWorld(Env):
     """
 
     def __init__(self, grid, diffusion=None, pvf_func='eigen', goal_cell=(8,8),
-                 agent_start_cell=(1,1), max_steps=100):
+                 agent_start_cell=(1,1), _max_steps=100):
         self.name = grid
         self._grid = self.get_grid(grid)
         self.diffusion = diffusion
@@ -225,7 +225,7 @@ class GridWorld(Env):
         self.first = True
 
         self.episode_steps = 0
-        self.max_steps = max_steps
+        self._max_steps = _max_steps
         self.info = {}
 
     def reset(self):
@@ -250,10 +250,10 @@ class GridWorld(Env):
         next_state = self.cell_to_idx[self.agent_cell]
         reward = float(next_state == self.goal)
 
-        truncation = self.episode_steps >= self.max_steps
+        truncation = False #TODO: fix for option steps self.episode_steps >= self._max_steps
         done = reward > 0 or truncation
 
-        self.episode_steps += 1
+        #self.episode_steps += 1
 
         # next_state, reward, done, truncation, info
         return next_state, reward, done, truncation, self.info
