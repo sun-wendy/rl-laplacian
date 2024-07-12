@@ -10,6 +10,7 @@ class Args:
 
     def __init__(self):
         self.parser = argparse.ArgumentParser(description="Command Line Arguments")
+        # Agent settings
         self.parser.add_argument('--agent_class', type=str2agentclass,
                                  default='QLearningAgent', choices=[QLearningAgent, SMDPQLearningAgent]),
         self.parser.add_argument('--learning_rate', type=float,
@@ -22,15 +23,17 @@ class Args:
                                  help='Random seed.')
         self.parser.add_argument('--anneal', type=str2bool, default='True',
                                  choices=[True, False], help='Whether to anneal exploration')
-        self.parser.add_argument('--option_sets', nargs='*', default=None,
-                                 choices=[None, 'primitive', 'base', 'safe'],
-                                 help='Names of fixed sets of options')
+        self.parser.add_argument('--n_eigenoptions', type=int, default=0,
+                                 help='Number of eigenoptions to use')
         # Environment settings
         self.parser.add_argument('--env_name', type=str,
                                  default='one_room',
                                  choices=['one_room', 'four_rooms', 'i_maze',
                                           'two_rooms', 'three_rooms', 'hard_maze'],
                                  help='Environment name.')
+        self.parser.add_argument('--diffusion', type=str, default='None',
+                                 choices=['None', 'diffusion', 'random_walk'],
+                                 help='Diffusion type for environment.')
         self.parser.add_argument('--max_steps', type=int, default=5_000,
                                  help='Maximum number of steps per episode.')
         # Settings for outputting results
@@ -55,6 +58,9 @@ class Args:
 
         for key, value in vars(args).items():
             setattr(self, key, value)
+
+        if args.diffusion == 'None':
+            args.diffusion = None
 
         if args.mode == 'save':
             assert args.log_dir != '', 'Must provide log_dir when using save'
@@ -96,28 +102,23 @@ def run_experiment(args):
         anneal=args.anneal,
         seed=args.seed,
         env_name=args.env_name,
+        diffusion=args.diffusion,
         max_steps=args.max_steps,
-        option_sets=args.option_sets)
+        n_eigenoptions=args.n_eigenoptions)
 
     # Save a video of the agent in the environment
     frames = []
     if args.eval_video:
-        _agent.epsilon = 0  # Sample greedily from the agent's policy
-
-        # frames dimensions are (time, width, height, channel)
-        if args.option_sets is not None:
-            frames = training.eval_video_fixed_options(_agent, args.env_name,
-                                                       option_sets=args.option_sets,
-                                                       max_steps=150,
-                                                       seed=args.seed)
-        else:
-            frames = training.eval_video(_agent, args.env_name, 150,
-                                         args.seed)
+        raise NotImplementedError
 
     # This python script is run :n: times, with the exact same arguments except for
     # the seeds. To visualize the mean and variance across runs, we use the same
     # group for each run, and distinguish the runs within a group by their seeds
-    group_name = f'{args.env_name}_{args.suffix}'
+    if args.agent_class == QLearningAgent:
+        group_name = f'{args.env_name}_{args.suffix}_no_options'
+    elif args.agent_class == SMDPQLearningAgent:
+        group_name = (f'{args.env_name}_{args.suffix}_{args.n_eigenoptions}_eigenoptions')
+
 
     # Print stats
     if args.mode == 'print':

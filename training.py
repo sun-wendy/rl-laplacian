@@ -7,15 +7,16 @@ from tqdm import tqdm
 import numpy as np
 import itertools
 from agent import SMDPQLearningAgent, QLearningAgent
-from gridworld import GridWorld
-from option import get_options
+from gridworld import Actions, GridWorld
+from create_gridworld_options import create_primitive_options, create_eigenoptions
+
 
 def get_env(env_name: str, max_steps: int, diffusion='normalised'):
     """Get a copy of the environment"""
     assert env_name in ['one_room', 'two_rooms', 'four_rooms', 'i_maze',
                         'hard_maze'], f"Invalid environment name: {env_name}"
 
-    env = GridWorld(grid_name=env_name, diffusion=diffusion, max_steps=max_steps)
+    env = GridWorld(grid=env_name, diffusion='normalised', max_steps=max_steps)
 
     return env
 
@@ -40,10 +41,11 @@ def run_loop(agent, env, n_episodes, anneal):
         while not done and total_steps < env.max_steps:
             action = agent.choose_action(state)
             next_state, reward, done, _, info = env.step(action)
-            agent.update(state, action, reward, next_state, done)
+            has_updated = agent.update(state, action, reward, next_state, done)
             state = next_state
             return_ += reward * np.power(agent.discount, total_steps)
-            total_steps += 1
+            if has_updated:
+                total_steps += 1
             #n_broken_vases += int(info['hit_vase'])
 
         stats['return'][episode] = return_
@@ -57,7 +59,7 @@ def run_loop(agent, env, n_episodes, anneal):
 
 
 def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
-              max_steps, agent_class, option_sets):
+              diffusion, max_steps, agent_class, n_eigenoptions):
     """Run agent
 
     Create an agent with the given parameters for the side effects penalty.
@@ -80,12 +82,16 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
         agent: trained agent
     """
     np.random.seed(seed)
-    env = get_env(env_name=env_name, max_steps=max_steps)
+    env = get_env(env_name=env_name, max_steps=max_steps, diffusion=diffusion)
 
     if agent_class == SMDPQLearningAgent:
 
-        assert option_sets is not None, f'Must provide option sets for {agent_class}'
-        options = get_options(option_sets)
+        options = create_primitive_options(env, actions=[Actions.down, Actions.right, Actions.up, Actions.left])
+
+        if n_eigenoptions > 0:
+            eigenoptions = create_eigenoptions(env, n_eigenoptions, discount)
+            options.update(eigenoptions)
+        print(options.keys())
 
         agent = agent_class(options=options,
                             learning_rate=learning_rate,
@@ -105,21 +111,36 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
 
 
 if __name__ == "__main__":
-    env_name = 'one_room'
-    action_names = ["down", "right", "up", "left"]
+    env_name = 'four_rooms'
+    diffusion = None
+    n_eigenoptions = 10
+    env = get_env(env_name, max_steps=100, diffusion=diffusion)
+    env.render()
 
-    if env_name == 'one_room':
-        env = get_env(env_name, max_steps=100)
-        print('Number of states: ', env.observation_space.n)
-        state, info = env.reset()
-        env.render()
-        exit()
 
-        for _ in range(20):
-            action = env.action_space.sample()
-            next_state, reward, done, truncated, info = env.step(action)
-            print(f'Cell: {env.idx_to_cell[state]}, '
-                  f'Action: {action_names[action]}, '
-                  f'Next Cell: {env.idx_to_cell[next_state]}')
-            state = next_state
+    options = create_primitive_options(env, actions=[Actions.down, Actions.right, Actions.up, Actions.left])
+
+    eigenoptions = create_eigenoptions(env, n_eigenoptions, discount=0.99)
+
+    options.update(eigenoptions)
+    from create_gridworld_options import plot_option
+
+    for name, option in options.items():
+        if 'pvf' not in name:
+            continue
+
+        plot_option(env, option, f'figures/option_plots/{env_name}/diffusion_'
+                                 f'{diffusion}/{env_name}_diffusion_{diffusion}_{name}')
+
+
+    print("Done.")
+
+
+    #for _ in range(20):
+    #    action = env.action_space.sample()
+    #    next_state, reward, done, truncated, info = env.step(action)
+    #    print(f'Cell: {env.idx_to_cell[state]}, '
+    #          f'Action: {action_names[action]}, '
+    #          f'Next Cell: {env.idx_to_cell[next_state]}')
+    #    state = next_state
 
