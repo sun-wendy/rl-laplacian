@@ -9,7 +9,7 @@ from gymnasium import Env, spaces, core
 plt.rcParams['animation.html'] = 'jshtml'
 
 # 1 (original name 10 x 10)
-one_room = """\
+one_room = """
 OOOOOOOOOO
 OOOOOOOOOO
 OOOOOOOOOO
@@ -23,14 +23,14 @@ OOOOOOOOOO
 """
 
 # 1
-i_maze = """\
+i_maze = """
 O             0
 OOOOOOOOOOOOOOO
 O             O
 """
 
 # 1
-four_rooms = """\
+four_rooms = """
 OOOOO OOOOO
 OOOOO OOOOO
 OOOOOOOOOOO
@@ -179,15 +179,24 @@ class GridWorld(Env):
         https://arxiv.org/pdf/1810.04586.pdf - The Laplacian in RL: Learning Representations with Efficient Approximations
     """
 
-    def __init__(self, grid_name, diffusion=None, pvf_func='eigen',
-                 agent_start_cell=(2, 2),
-                 goal_cell=(8, 8), max_steps=5_000):
-
-        self.grid_name = grid_name
-        self._grid = self.get_grid(grid_name)
+    def __init__(self, grid, diffusion=None, pvf_func='eigen', goal_cell=(8,8),
+                 agent_start_cell=(1,1), max_steps=100):
+        self.name = grid
+        self._grid = self.get_grid(grid)
         self.diffusion = diffusion
 
-        # From any state the agent can perform one of four actions
+        for variable in 'ADLev':
+            # A : Adjacency
+            # D : Diagonal
+            # L : Laplacian
+            # e : Eigen / Singular values
+            # v : Eigen / Singular vectors
+            setattr(self, f'_{variable}', None)
+
+        self.pvf = getattr(self, f'_{pvf_func}')
+
+        ### START OF NEW CODE ###
+
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.Discrete(np.sum(self._grid == 1))
 
@@ -219,37 +228,15 @@ class GridWorld(Env):
         self.max_steps = max_steps
         self.info = {}
 
-        # Stuff for proto-value function
-        for variable in 'ADLev':
-            # A : Adjacency
-            # D : Diagonal
-            # L : Laplacian
-            # e : Eigen / Singular values
-            # v : Eigen / Singular vectors
-            setattr(self, f'_{variable}', None)
-
-        self.pvf = getattr(self, f'_{pvf_func}')
-
-    def get_grid(self, grid_name: str) -> np.ndarray:
-        """Create the grid from the grid name. Cells have value 0 if the agent
-        can't occupy that state and 1 otherwise."""
-        if grid_name not in globals():
-            raise Exception(f'"{grid_name}" not recognised!')
-        layout = globals().get(grid_name)
-        grid = np.array([list(map(lambda c: 1 if c == 'O' else 0, line)) for line in
-                         layout.splitlines()])
-
-        return np.pad(grid, 1)
-
     def reset(self):
         self.episode_steps = 0
         state = self.cell_to_idx[self.agent_start_cell]
         self.agent_cell = self.idx_to_cell[state]
         return state, self.info
-    
+
     def set_goal(self, goal: int):
         self.goal = goal
-        
+
     def step(self, action: int):
         """
         Take one step in the environment
@@ -271,9 +258,23 @@ class GridWorld(Env):
         # next_state, reward, done, truncation, info
         return next_state, reward, done, truncation, self.info
 
+        ### END OF NEW CODE ###
+
+    def get_grid(self, name):
+        if name not in globals():
+            raise Exception(f'"{name}" not recognised!')
+        string = globals().get(name)
+        split = string.split('\n')[1:-1]
+        n = len(split)
+        m = max(map(len, split))
+        grid = np.zeros((n, m))
+        for i, row in enumerate(split):
+            grid[i, np.where(np.array([*row]) != ' ')[0]] = 1.
+        return np.pad(grid, 1)
+
     def render(self, k=None, p=1, gamma=0.99, animate=False, save=True):
         """ renders the gridworld """
-        num = self.grid_name
+        num = self.name
         if k is None:
             fig = plt.figure(figsize=(8, 6), num=num)
             self._render()
@@ -283,7 +284,8 @@ class GridWorld(Env):
             fig = plt.figure(figsize=(16, 6), num=num)
             fig.add_subplot(1, 2, 1)
             V, T = self.value_iterate(k, p, gamma)
-            plt.title(self.grid_name)
+            print("len T: ", len(T))
+            plt.title(self.name)
             self._render()
             self._render_annotate(k, p, gamma, V, T)
             ax = fig.add_subplot(1, 2, 2, projection='3d')
@@ -297,8 +299,7 @@ class GridWorld(Env):
             if save:
                 try:
                     os.makedirs('results', exist_ok=True)
-                    anim.save(os.path.join('results', f'{self.grid_name}'
-                                                      f'-{k + 1}.gif'), writer='imagemagick')
+                    anim.save(os.path.join('results', f'{self.name}-{k + 1}.gif'), writer='imagemagick')
                 except:
                     print('Failed to save gif!')
             return anim
@@ -409,17 +410,12 @@ class GridWorld(Env):
         return self._v
 
     def _render(self):
-        """ Renders the environment with the agent and the goal """
-        map = 1 - self._grid
-        map[self.agent_cell] = -1
-        map[self.goal_cell] = -1
-        plt.imshow(map, cmap='RdGy')
-        plt.savefig('map.png', dpi=400)
-
-        for i in range(map.shape[0]):
-            plt.hlines(i + 0.5, -0.5, map.shape[1] - 0.5, alpha=0.2)
-        for j in range(map.shape[1]):
-            plt.vlines(j + 0.5, -0.5, map.shape[0] - 0.5, alpha=0.2)
+        """ Renders the environment """
+        plt.imshow(self._grid, cmap='magma')
+        for i in range(self._grid.shape[0]):
+            plt.hlines(i + 0.5, -0.5, self._grid.shape[1] - 0.5, alpha=0.2)
+        for j in range(self._grid.shape[1]):
+            plt.vlines(j + 0.5, -0.5, self._grid.shape[0] - 0.5, alpha=0.2)
         plt.xticks([])
         plt.yticks([])
 
