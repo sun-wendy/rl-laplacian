@@ -8,15 +8,29 @@ import numpy as np
 import itertools
 from agent import QLearningAgent
 from gridworld import Actions, GridWorld
+from gridworld_with_vases import GridWorldWithVases
 from create_gridworld_options import create_primitive_options, create_eigenoptions
 
 
 def get_env(env_name: str, _max_steps: int, diffusion='normalised'):
     """Get a copy of the environment"""
     assert env_name in ['one_room', 'two_rooms', 'four_rooms', 'i_maze',
-                        'hard_maze'], f"Invalid environment name: {env_name}"
+                        'hard_maze', 'four_rooms_alt','four_rooms_alt_with_vases'],\
+                       f"Invalid environment name: {env_name}"
 
-    env = GridWorld(grid=env_name, diffusion=diffusion, _max_steps=_max_steps)
+    if "vases" not in env_name:
+        env = GridWorld(grid=env_name, diffusion=diffusion, _max_steps=_max_steps)
+    else:
+        grid_name = env_name.split("_with_vases")[0]
+
+        if grid_name == 'four_rooms_alt':
+            vase_coords = [(1, 3), (1, 9), (3, 1), (9, 1), (11, 3), (11, 9), (9, 11),
+                           (3, 11)]
+        else:
+            raise NotImplementedError
+
+        env = GridWorldWithVases(grid=grid_name, diffusion=diffusion,
+                                 _max_steps=_max_steps, vase_coords=vase_coords)
 
     return env
 
@@ -27,13 +41,11 @@ def run_loop_fixed_options(agent, env, options, n_episodes, anneal):
              'option_return': np.zeros(n_episodes),
              'option_steps': np.zeros(n_episodes),
              'exploration_rate': np.zeros(n_episodes),
-             'total_steps': np.zeros(n_episodes)}
-             #'n_broken_vases': np.zeros(n_episodes)}
+             'total_steps': np.zeros(n_episodes),
+             'n_broken_vases': np.zeros(n_episodes)}
 
     _options = list(options.values())
     option_names = list(options.keys())
-
-    MAX_OPTION_STEPS = 100
 
     assert agent.n_actions == len(_options), ("Number of agent actions must match "
                                               "the number of options.")
@@ -61,7 +73,7 @@ def run_loop_fixed_options(agent, env, options, n_episodes, anneal):
             #print('Action: ', action)
 
             next_state_idx, reward, done, truncated, info = env.step(action)
-            #n_broken_vases += int(info["hit_vase"])
+            n_broken_vases += int(info["hit_vase"])
             total_steps += 1
             option_steps += 1
 
@@ -77,7 +89,7 @@ def run_loop_fixed_options(agent, env, options, n_episodes, anneal):
                 #print('action: ', action)
                 next_state_idx, next_reward, done, truncated, info = env.step(
                     action)
-                #n_broken_vases += int(info["hit_vase"])
+                n_broken_vases += int(info["hit_vase"])
                 reward += next_reward
                 total_steps += 1
 
@@ -91,6 +103,7 @@ def run_loop_fixed_options(agent, env, options, n_episodes, anneal):
         stats['option_return'][episode] = option_return_
         stats['total_steps'][episode] = total_steps
         stats['option_steps'][episode] = option_steps
+        stats['n_broken_vases'][episode] = n_broken_vases
         stats['exploration_rate'][episode] = agent.epsilon
         #stats['n_broken_vases'][episode] = n_broken_vases
 
@@ -129,7 +142,7 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
     if agent_class == QLearningAgent:
 
         # Create four primitive options for each of the base actions
-        options = create_primitive_options(env, actions=[Actions.down, Actions.right, Actions.up, Actions.left])
+        options = create_primitive_options(env)
 
         if n_eigenoptions > 0:
             eigenoptions = create_eigenoptions(env, n_eigenoptions, discount)
@@ -160,36 +173,40 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
 
 
 if __name__ == "__main__":
-    env_name = 'one_room'
+    env_name = 'four_rooms_alt_with_vases'
     diffusion = "normalised"
-    n_eigenoptions = 10
+    n_eigenoptions = 0
     discount = 0.9
     env = get_env(env_name, _max_steps=100, diffusion=diffusion)
-    env.render()
 
-    options = create_primitive_options(env, actions=[Actions.down, Actions.right, Actions.up, Actions.left])
+    options = create_primitive_options(env)
 
-    eigenoptions = create_eigenoptions(env, n_eigenoptions, discount=discount)
+    if n_eigenoptions > 0:
+        eigenoptions = create_eigenoptions(env, n_eigenoptions, discount=discount)
+        options.update(eigenoptions)
+        from create_gridworld_options import plot_option
 
-    options.update(eigenoptions)
-    from create_gridworld_options import plot_option
+        for name, option in options.items():
+            if 'pvf' not in name:
+                continue
 
-    for name, option in options.items():
-        if 'pvf' not in name:
-            continue
-
-        plot_option(env, option, f'figures/option_plots/{env_name}/diffusion_'
-                                 f'{diffusion}/{env_name}_diffusion_{diffusion}_{name}')
-
-
-    print("Done.")
+            plot_option(env, option, f'figures/option_plots/{env_name}/diffusion_'
+                                     f'{diffusion}/{env_name}_diffusion_{diffusion}_{name}')
 
 
-    #for _ in range(20):
-    #    action = env.action_space.sample()
-    #    next_state, reward, done, truncated, info = env.step(action)
-    #    print(f'Cell: {env.idx_to_state[state]}, '
-    #          f'Action: {action_names[action]}, '
-    #          f'Next Cell: {env.idx_to_state[next_state]}')
-    #    state = next_state
+    import matplotlib.pyplot as plt
+
+    state_idx, info = env.reset()
+
+    for i in range(20):
+        action = env.action_space.sample()
+        next_state_idx, reward, done, truncated, info = env.step(action)
+        print(env.idx_to_state[next_state_idx])
+        state_idx = next_state_idx
+
+        frame = env.render_frame()
+        plt.imshow(frame)
+        plt.axis('off')
+        plt.savefig(f'figures/step_{i}.png', dpi=400)
+        plt.close()
 

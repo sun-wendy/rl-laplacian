@@ -1,6 +1,8 @@
 """Run a Q-learning agent with a side effects penalty."""
 
 import argparse
+
+import evaluation
 import training
 from agent import QLearningAgent
 
@@ -29,7 +31,8 @@ class Args:
         self.parser.add_argument('--env_name', type=str,
                                  default='one_room',
                                  choices=['one_room', 'four_rooms', 'i_maze',
-                                          'two_rooms', 'three_rooms', 'hard_maze'],
+                                          'two_rooms', 'three_rooms', 'hard_maze',
+                                          'four_rooms_alt_with_vases'],
                                  help='Environment name.')
         self.parser.add_argument('--diffusion', type=str, default='normalised',
                                  choices=['None', 'normalised', 'random_walk'],
@@ -107,7 +110,13 @@ def run_experiment(args):
     # Save a video of the agent in the environment
     frames = []
     if args.eval_video:
-        raise NotImplementedError
+        _agent.epsilon = 0   # Sample greedily from the agent's policy
+
+        # frames dimensions are (time, width, height, channel)
+        frames = evaluation.eval_loop_fixed_options(_agent, args.env_name,
+                                                    max_steps=args.max_steps,
+                                                    n_eigenoptions=args.n_eigenoptions,
+                                                    seed=args.seed)
 
     # This python script is run :n: times, with the exact same arguments except for
     # the seeds. To visualize the mean and variance across runs, we use the same
