@@ -6,7 +6,7 @@ environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 from tqdm import tqdm
 import numpy as np
 import itertools
-from agent import QLearningAgent, QLearningFixedOptionsAgent
+from agent import QLearningAgent
 from gridworld import Actions, GridWorld
 from create_gridworld_options import create_primitive_options, create_eigenoptions
 
@@ -21,60 +21,22 @@ def get_env(env_name: str, _max_steps: int, diffusion='normalised'):
     return env
 
 
-def run_loop(agent, env, n_episodes, anneal):
-    """Training agent"""
-    stats = {'return': np.zeros(n_episodes),
-             'total_steps': np.zeros(n_episodes)}
-             #'n_broken_vases': np.zeros(n_episodes)}
-
-    if anneal:
-        agent.epsilon = 1.0
-        eps_unit = 1.0 / n_episodes
-
-    for episode in tqdm(range(n_episodes)):
-        return_ = 0
-        total_steps = 0
-        n_broken_vases = 0
-        state, info = env.reset()
-        agent.reset()
-        done = False
-
-        while not done and total_steps < env._max_steps:
-            action = agent.choose_action(state)
-            next_state, reward, done, truncation, info = env.step(action)
-            has_updated = agent.update(state, action, reward, next_state, done)
-            state = next_state
-            return_ += reward * np.power(agent.discount, total_steps)
-            if has_updated:
-                total_steps += 1
-            if reward == 0 and done:
-                print(f'Episode finished after {total_steps} steps')
-            #print('total steps: ', total_steps)
-            #n_broken_vases += int(info['hit_vase'])
-
-        stats['return'][episode] = return_
-        stats['total_steps'][episode] = total_steps
-        #stats['n_broken_vases'][episode] = n_broken_vases
-
-        if anneal:
-            agent.epsilon = max(0, agent.epsilon - eps_unit)
-
-    return stats
-
-
 def run_loop_fixed_options(agent, env, options, n_episodes, anneal):
-    """Training agent to select fixed options."""
+    """Training an agent to select fixed options."""
     stats = {'return': np.zeros(n_episodes),
+             'option_return': np.zeros(n_episodes),
+             'option_steps': np.zeros(n_episodes),
+             'exploration_rate': np.zeros(n_episodes),
              'total_steps': np.zeros(n_episodes)}
              #'n_broken_vases': np.zeros(n_episodes)}
 
     _options = list(options.values())
     option_names = list(options.keys())
 
-    MAX_OPTION_STEPS = 40
+    MAX_OPTION_STEPS = 100
 
-    assert agent.n_actions == len(options), ("Number of agent actions must match "
-                                             "the number of options.")
+    assert agent.n_actions == len(_options), ("Number of agent actions must match "
+                                              "the number of options.")
 
     if anneal:
         agent.epsilon = 1.0
@@ -82,60 +44,61 @@ def run_loop_fixed_options(agent, env, options, n_episodes, anneal):
 
     for episode in tqdm(range(n_episodes)):
         return_ = 0
+        option_return_ = 0
         total_steps = 0
-        option_steps = 0
+        option_steps = 0    # number of times a new option is selected
         n_broken_vases = 0
-        state, info = env.reset()
-        agent.reset()
+        state_idx, info = env.reset()
+        #print(f'Start state: {env.idx_to_state[state_idx]}, index {state_idx}')
         done = False
 
-        while not done and option_steps < env._max_steps:
+        while not done and total_steps < env._max_steps:
 
-            option_idx = agent.choose_action(state)
+            option_idx = agent.choose_action(state_idx)
             option = _options[option_idx]
-            print("Selecting option ", option_names[option_idx])
+            #print("Selecting option ", option_names[option_idx])
+            action = option.policy_selection(state_idx)
+            #print('Action: ', action)
 
-            next_state, reward, done, truncated, info = env.step(
-                option.policy_selection(state))
+            next_state_idx, reward, done, truncated, info = env.step(action)
             #n_broken_vases += int(info["hit_vase"])
             total_steps += 1
             option_steps += 1
 
-            intra_option_steps = 1
-            print('Option terminates at: ', [env.idx_to_cell[t] for t in
-                                             option.termination_set])
+            current_option_steps = 1
+            #print('Option terminates at: ', [env.idx_to_state[t] for t in
+            #                                 option.termination_set])
             # Run the option until it terminates
-            while (not option.termination_condition(next_state) and not done and
-                   intra_option_steps <= MAX_OPTION_STEPS):
-                next_state, next_reward, done, truncated, info = env.step(
-                    option.policy_selection(next_state))
-                print(env.idx_to_cell[next_state])
+            while (not option.termination_condition(next_state_idx) and not done and
+                   total_steps <= env._max_steps):
+                #print(f'state: {env.idx_to_state[next_state_idx]}, index'
+                #      f' {next_state_idx}')
+                action = option.policy_selection(next_state_idx)
+                #print('action: ', action)
+                next_state_idx, next_reward, done, truncated, info = env.step(
+                    action)
                 #n_broken_vases += int(info["hit_vase"])
                 reward += next_reward
                 total_steps += 1
-                intra_option_steps += 1
 
-                if intra_option_steps == MAX_OPTION_STEPS:
-                    print(f'Option {option_names[option_idx]} timeout')
+            agent.update(state_idx, option_idx, reward, next_state_idx, done)
 
-                agent.update(state, option_idx, reward, next_state, done)
-
-            exit()
-
-            state = next_state
+            state_idx = next_state_idx
             return_ += np.power(agent.discount, total_steps) * reward
+            option_return_ += np.power(agent.discount, option_steps) * reward
 
         stats['return'][episode] = return_
+        stats['option_return'][episode] = option_return_
         stats['total_steps'][episode] = total_steps
+        stats['option_steps'][episode] = option_steps
+        stats['exploration_rate'][episode] = agent.epsilon
         #stats['n_broken_vases'][episode] = n_broken_vases
-
-        print('Return: ', return_)
-        print('Option steps: ', option_steps)
 
         if anneal:
             agent.epsilon = max(0, agent.epsilon - eps_unit)
 
     return stats
+
 
 def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
               diffusion, max_steps, agent_class, n_eigenoptions):
@@ -163,42 +126,37 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
     np.random.seed(seed)
     env = get_env(env_name=env_name, _max_steps=max_steps, diffusion=diffusion)
 
-    if agent_class == QLearningFixedOptionsAgent:
+    if agent_class == QLearningAgent:
 
+        # Create four primitive options for each of the base actions
         options = create_primitive_options(env, actions=[Actions.down, Actions.right, Actions.up, Actions.left])
 
         if n_eigenoptions > 0:
             eigenoptions = create_eigenoptions(env, n_eigenoptions, discount)
             options.update(eigenoptions)
 
-            from create_gridworld_options import plot_option
+            #print("Plotting options...")
+            #from create_gridworld_options import plot_option
 
-            for name, eig_option in eigenoptions.items():
+            #for name, eig_option in eigenoptions.items():
 
-                plot_option(env, eig_option, f'figures/option_plots'
-                                          f'/{env_name}_diffusion_{diffusion}_{name}')
+            #    plot_option(env, eig_option, f'figures/option_plots'
+            #                              f'/{env_name}_diffusion_{diffusion}_{name}')
+
+            #print("Done.")
 
         agent = QLearningAgent(n_actions=len(list(options.keys())),
                                learning_rate=learning_rate,
                                discount=discount)
-        #agent = agent_class(options=options,
-        #                    learning_rate=learning_rate,
-        #                    discount=discount)
-        stats = run_loop_fixed_options(agent, env, options=options, n_episodes=n_episodes,
-                         anneal=anneal)
 
-    elif agent_class == QLearningAgent:
+        stats = run_loop_fixed_options(agent, env, options=options,
+                                       n_episodes=n_episodes, anneal=anneal)
 
-        agent = agent_class(n_actions=env.action_space.n,
-                            learning_rate=learning_rate,
-                            discount=discount)
-
-        stats = run_loop(agent, env, n_episodes=n_episodes, anneal=anneal)
     else:
         raise ValueError(f'Invalid agent class {agent_class}')
 
-
     return stats, agent
+
 
 
 if __name__ == "__main__":
@@ -230,8 +188,8 @@ if __name__ == "__main__":
     #for _ in range(20):
     #    action = env.action_space.sample()
     #    next_state, reward, done, truncated, info = env.step(action)
-    #    print(f'Cell: {env.idx_to_cell[state]}, '
+    #    print(f'Cell: {env.idx_to_state[state]}, '
     #          f'Action: {action_names[action]}, '
-    #          f'Next Cell: {env.idx_to_cell[next_state]}')
+    #          f'Next Cell: {env.idx_to_state[next_state]}')
     #    state = next_state
 

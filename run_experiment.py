@@ -2,7 +2,7 @@
 
 import argparse
 import training
-from agent import QLearningAgent, QLearningFixedOptionsAgent
+from agent import QLearningAgent
 
 
 class Args:
@@ -12,7 +12,7 @@ class Args:
         self.parser = argparse.ArgumentParser(description="Command Line Arguments")
         # Agent settings
         self.parser.add_argument('--agent_class', type=str2agentclass,
-                                 default='QLearningAgent', choices= [QLearningFixedOptionsAgent, QLearningAgent]),
+                                 default='QLearningAgent', choices=[QLearningAgent]),
         self.parser.add_argument('--learning_rate', type=float,
                                  default=0.1, help='Learning rate for training')
         self.parser.add_argument('--discount', type=float, default=0.9,
@@ -85,8 +85,6 @@ def str2agentclass(v):
     """Turns command line arguments into boolean values"""
     if v == "QLearningAgent":
         return QLearningAgent
-    elif v == "QLearningFixedOptionsAgent":
-        return QLearningFixedOptionsAgent
     else:
         raise argparse.ArgumentTypeError(f'Unrecognized agent class: {v}.')
 
@@ -115,9 +113,8 @@ def run_experiment(args):
     # the seeds. To visualize the mean and variance across runs, we use the same
     # group for each run, and distinguish the runs within a group by their seeds
     if args.agent_class == QLearningAgent:
-        group_name = f'{args.env_name}_{args.suffix}_no_options'
-    elif args.agent_class == QLearningFixedOptionsAgent:
-        group_name = (f'{args.env_name}_{args.suffix}_{args.n_eigenoptions}_eigenoptions')
+        group_name = (f'{args.env_name}_{args.suffix}_{args.n_eigenoptions}_eigenoptions'
+                      f'_diffusion_{args.diffusion}')
 
 
     # Print stats
