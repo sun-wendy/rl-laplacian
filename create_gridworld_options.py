@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 from enum import IntEnum
 from option import Option
 from gridworld import GridWorld, Actions
@@ -28,12 +28,15 @@ def plot_option(env: GridWorld, option: Option, suffix=''):
     plt.close()
 
 
-def create_primitive_options(env: GridWorld, actions: List[IntEnum]) -> Dict[
-    str, Option]:
+def create_primitive_options(env: GridWorld, actions: Optional[List[IntEnum]] =
+None) -> Dict[str, Option]:
     """Create primitive options from a list of actions"""
     primitive_options = {}
 
     state_idxs = list(env.idx_to_state.keys())
+
+    if actions is None:
+        actions = [Actions.down, Actions.right, Actions.up, Actions.left]
 
     # Create an option for each action
     for action in actions:

@@ -179,7 +179,7 @@ class GridWorld(Env):
         https://arxiv.org/pdf/1810.04586.pdf - The Laplacian in RL: Learning Representations with Efficient Approximations
     """
 
-    def __init__(self, grid, diffusion=None, pvf_func='eigen', goal_state=(8, 8),
+    def __init__(self, grid, diffusion=None, pvf_func='eigen', goal_state=(11, 11),
                  agent_start_state=(1, 1), _max_steps=100):
         self.name = grid
         self._grid = self.get_grid(grid)
@@ -244,6 +244,8 @@ class GridWorld(Env):
 
         # Check if we can move to the next cell
         try:
+            self.info['hit_vase'] = False
+
             if self._grid[next_state] == 1:
                 self.agent_state = next_state
         except ValueError:
@@ -467,3 +469,15 @@ class GridWorld(Env):
         v, e, _ = np.linalg.svd(self.L, full_matrices=False)
         self._e = e[::-1]
         self._v = v[:, ::-1]
+
+    def render_frame(self) -> np.ndarray:
+        """ Renders the environment and returns a frame as a numpy array,
+        with dimensions (width, height, channel)"""
+        frame = np.zeros((self._grid.shape[0], self._grid.shape[1], 3),
+                         dtype=np.uint8)
+
+        frame[self._grid == 1] = [255, 255, 255]
+        frame[self.goal_state] = [0, 255, 0]
+        frame[self.agent_state] = [50, 0, 255]
+
+        return frame
