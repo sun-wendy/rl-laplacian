@@ -179,8 +179,8 @@ class GridWorld(Env):
         https://arxiv.org/pdf/1810.04586.pdf - The Laplacian in RL: Learning Representations with Efficient Approximations
     """
 
-    def __init__(self, grid, diffusion=None, pvf_func='eigen', goal_cell=(8,8),
-                 agent_start_cell=(1,1), _max_steps=100):
+    def __init__(self, grid, diffusion=None, pvf_func='eigen', goal_state=(8, 8),
+                 agent_start_state=(1, 1), _max_steps=100):
         self.name = grid
         self._grid = self.get_grid(grid)
         self.diffusion = diffusion
@@ -200,25 +200,24 @@ class GridWorld(Env):
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.Discrete(np.sum(self._grid == 1))
 
-        self.directions = [np.array((0, 1)), np.array((1, 0)), np.array((-1, 0)),
+        self.directions = [np.array((1, 0)), np.array((0, 1)), np.array((-1, 0)),
                            np.array((0, -1))]  # down,right,up,left
 
         # Create a mapping between cell coordinates and state indices
-        self.cell_to_idx = {}
-        cell_num = 0
-        for i in range(self._grid.shape[0]):
-            for j in range(self._grid.shape[1]):
-                if self._grid[i, j] == 1:
-                    self.cell_to_idx[(i, j)] = cell_num
-                    cell_num += 1
-        self.idx_to_cell = {v: k for k, v in self.cell_to_idx.items()}
+        # First coord of the state is the row and second coord is the column
+        self.state_to_idx = {}
+        state_num = 0
+        for state in zip(*np.where(self._grid)):
+            if self._grid[state] == 1:
+                self.state_to_idx[state] = state_num
+                state_num += 1
+        self.idx_to_state = {v: k for k, v in self.state_to_idx.items()}
 
-        assert agent_start_cell != goal_cell, ('agent_start_pos and goal_pos are '
-                                               'theame')
-        self.agent_start_cell = agent_start_cell
-        self.agent_cell = agent_start_cell
-        self.goal_cell = goal_cell
-        self.goal = self.cell_to_idx[goal_cell]
+        assert agent_start_state != goal_state, 'agent_start_state and goal_state are the same'
+        self.agent_start_state = agent_start_state
+        self.agent_state = None
+        self.goal_state = goal_state
+        self.goal = self.state_to_idx[goal_state]
 
         self.init_states = list(range(self.observation_space.n))
         self.init_states.remove(self.goal)
@@ -230,9 +229,9 @@ class GridWorld(Env):
 
     def reset(self):
         self.episode_steps = 0
-        state = self.cell_to_idx[self.agent_start_cell]
-        self.agent_cell = self.idx_to_cell[state]
-        return state, self.info
+        state_idx = self.state_to_idx[self.agent_start_state]
+        self.agent_state = self.idx_to_state[state_idx]
+        return state_idx, self.info
 
     def set_goal(self, goal: int):
         self.goal = goal
@@ -241,14 +240,20 @@ class GridWorld(Env):
         """
         Take one step in the environment
         """
-        next_cell = tuple(self.agent_cell + self.directions[action])
+        next_state = tuple(self.agent_state + self.directions[action])
 
         # Check if we can move to the next cell
-        if self._grid[next_cell] == 1:
-            self.agent_cell = next_cell
+        try:
+            if self._grid[next_state] == 1:
+                self.agent_state = next_state
+        except ValueError:
+            print("Next State: ", next_state)
+            print(self._grid[next_state])
+            print("Error!")
+            exit(1)
 
-        next_state = self.cell_to_idx[self.agent_cell]
-        reward = float(next_state == self.goal)
+        next_state_idx = self.state_to_idx[self.agent_state]
+        reward = float(next_state_idx == self.goal)
 
         truncation = False #TODO: fix for option steps self.episode_steps >= self._max_steps
         done = reward > 0 or truncation
@@ -256,7 +261,7 @@ class GridWorld(Env):
         #self.episode_steps += 1
 
         # next_state, reward, done, truncation, info
-        return next_state, reward, done, truncation, self.info
+        return next_state_idx, reward, done, truncation, self.info
 
         ### END OF NEW CODE ###
 
@@ -367,7 +372,7 @@ class GridWorld(Env):
         """ laplacian matrix """
         if isinstance(self._L, np.ndarray):
             return self._L
-        if self.diffusion is None:
+        if self.diffusion in [None, "None"]:
             self._L = self.D - self.A
             return self._L
         elif self.diffusion in ['normalised', 'normalized']:
