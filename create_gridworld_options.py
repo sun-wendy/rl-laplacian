@@ -17,12 +17,12 @@ def plot_option(env: GridWorld, option: Option, suffix=''):
     plt.xticks([])
     plt.yticks([])
 
-    for idx, cell in env.idx_to_cell.items():
+    for idx, state in env.idx_to_state.items():
         if idx in option.termination_set:
-            plt.annotate(r'$\mathbf{T}$', cell[::-1], va='center', ha='center',
+            plt.annotate(r'$\mathbf{T}$', state[::-1], va='center', ha='center',
                          c='r')
         else:
-            plt.annotate('⇩⇨⇧⇦'[option.policy[idx]], cell[::-1], va='center',ha='center')
+            plt.annotate('⇩⇨⇧⇦'[option.policy[idx]], state[::-1], va='center',ha='center')
 
     plt.savefig(f'{suffix}.png')
     plt.close()
@@ -33,14 +33,14 @@ def create_primitive_options(env: GridWorld, actions: List[IntEnum]) -> Dict[
     """Create primitive options from a list of actions"""
     primitive_options = {}
 
-    states = list(env.idx_to_cell.keys())
+    state_idxs = list(env.idx_to_state.keys())
 
     # Create an option for each action
     for action in actions:
         primitive_options[str(action).split(".")[-1]] = \
-            Option(init_set=states,
-                   term_set=states,
-                   policy={state: action for state in states})
+            Option(init_set=state_idxs,
+                   term_set=state_idxs,
+                   policy={state_idx: action for state_idx in state_idxs})
 
     return primitive_options
 
@@ -56,16 +56,16 @@ def _create_eigenoption(env: GridWorld, k: int, discount: float) -> (
     init_set = []
     actions = [Actions.down, Actions.right, Actions.up, Actions.left]
 
-    for cell in zip(*np.where(env.grid)):
-        values = [env.r(k, cell, next_cell) + discount * V[next_cell] for
-                  next_cell in env.find_adjacent(cell)]
+    for idx, state in env.idx_to_state.items():
+        values = [env.r(k, state, next_state) + discount * V[next_state] for
+                  next_state in env.find_adjacent(state)]
         if len(np.unique(values)) > 1:
-            policy[env.cell_to_idx[cell]] = actions[np.argmax(values)]
-            init_set.append(env.cell_to_idx[cell])
+            policy[idx] = actions[np.argmax(values)]
+            init_set.append(idx)
 
     return Option(init_set=init_set,
                   policy=policy,
-                  term_set=[env.cell_to_idx[term_cell] for term_cell in T])
+                  term_set=[env.state_to_idx[term_state] for term_state in T])
 
 
 def create_eigenoptions(env: GridWorld, n_eigenoptions: int, discount: float) \
