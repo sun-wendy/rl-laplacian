@@ -1,7 +1,6 @@
 """Run a Q-learning agent with a side effects penalty."""
 
 import argparse
-
 import evaluation
 import training
 from agent import QLearningAgent

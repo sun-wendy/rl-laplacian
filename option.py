@@ -41,5 +41,3 @@ class Option:
 
     def step(self, state):
         return self.policy_selection(state), self.termination_condition(state)
-
-

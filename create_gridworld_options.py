@@ -1,12 +1,13 @@
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Union
 from enum import IntEnum
 from option import Option
+from safe_options import SafeOption
 from gridworld import GridWorld, Actions
 import numpy as np
 import matplotlib.pyplot as plt
 
 
-def plot_option(env: GridWorld, option: Option, suffix=''):
+def plot_option(env: GridWorld, option: Union[Option, SafeOption], suffix=''):
     """ Renders the environment """
     # Plot the environment
     plt.imshow(env._grid, cmap='magma')
@@ -29,7 +30,7 @@ def plot_option(env: GridWorld, option: Option, suffix=''):
 
 
 def create_primitive_options(env: GridWorld, actions: Optional[List[IntEnum]] =
-None) -> Dict[str, Option]:
+None) -> Dict[str, Union[Option, SafeOption]]:
     """Create primitive options from a list of actions"""
     primitive_options = {}
 
@@ -49,7 +50,7 @@ None) -> Dict[str, Option]:
 
 
 def _create_eigenoption(env: GridWorld, k: int, discount: float) -> (
-        Option):
+        Union[Option, SafeOption]):
     """:k: is the index of the eigenpurpose to create the option from"""
 
     # returns value function (V) and set of terminal states (T)
@@ -73,7 +74,7 @@ def _create_eigenoption(env: GridWorld, k: int, discount: float) -> (
 
 def create_eigenoptions(env: GridWorld, n_eigenoptions: int, discount: float) \
         -> (
-        Dict)[str, Option]:
+        Dict)[str, Union[Option, SafeOption]]:
     """Creates eigenoptions from the environment"""
     eigenoptions = {}
     for k in range(n_eigenoptions):

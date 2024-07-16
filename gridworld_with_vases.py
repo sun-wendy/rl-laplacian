@@ -164,14 +164,12 @@ class GridWorldWithVases(Env):
         state_num = 0
         for coords in zip(*np.where(self._grid)):
             if self._grid[coords] == 1:
-                for n_broken_vases in range(len(vase_coords)+1):
-                    self.state_to_idx[(*coords, n_broken_vases)] = state_num
-                    state_num += 1
+                self.state_to_idx[coords] = state_num
+                state_num += 1
 
         self.idx_to_state = {v: k for k, v in self.state_to_idx.items()}
 
-        assert agent_start_coords != goal_coords, ('agent_start_state and '
-                                                  'goal_statere the same')
+        assert agent_start_coords != goal_coords, ('agent_start_state and goal_state the same')
         self.agent_start_coords = agent_start_coords
         self.agent_state = None
         self.goal_coords = goal_coords
@@ -187,7 +185,7 @@ class GridWorldWithVases(Env):
     def reset(self):
         self.episode_steps = 0
         self.broken_vase_coords = []
-        state_idx = self.state_to_idx[(*self.agent_start_coords, 0)]
+        state_idx = self.state_to_idx[self.agent_start_coords]
         self.agent_state = self.idx_to_state[state_idx]
         return state_idx, self.info
 
@@ -198,8 +196,7 @@ class GridWorldWithVases(Env):
         """
         Take one step in the environment
         """
-        next_state_coords = tuple(np.array((self.agent_state[0],
-                                   self.agent_state[1])) + self.directions[action])
+        next_state_coords = tuple(np.array((self.agent_state[0], self.agent_state[1])) + self.directions[action])
 
         # Check if we can move to the next cell
         try:
@@ -209,11 +206,11 @@ class GridWorldWithVases(Env):
                 # Check if an agent has stepped in a square with a vase
                 if (next_state_coords in self.vase_coords and
                         next_state_coords not in self.broken_vase_coords):
-                    self.agent_state = (*next_state_coords, self.agent_state[-1]+1)
+                    self.agent_state = next_state_coords
                     self.broken_vase_coords.append(next_state_coords)
                     self.info['hit_vase'] = True
                 else:
-                    self.agent_state = (*next_state_coords, self.agent_state[-1])
+                    self.agent_state = next_state_coords
 
         except ValueError:
             print("Next State Coords: ", next_state_coords)
@@ -222,8 +219,7 @@ class GridWorldWithVases(Env):
             exit(1)
 
         next_state_idx = self.state_to_idx[self.agent_state]
-        reward = float((self.agent_state[0], self.agent_state[1]) ==
-                       self.goal_coords)
+        reward = float((self.agent_state[0], self.agent_state[1]) == self.goal_coords)
 
         truncation = False #TODO: fix for option steps self.episode_steps >= self._max_steps
         done = reward > 0 or truncation

@@ -15,13 +15,13 @@ do
       --max_steps=100 \
       --seed=$seed \
       --agent_class="QLearningAgent" \
-      --n_eigenoptions=0 \
+      --n_eigenoptions=3 \
       --diffusion="None" \
       --discount=0.9 \
       --mode=save \
       --log_dir=./logs/$current_datetime \
       --suffix="" \
       --wandb=True \
-      --wandb_project=side-effects-debug\
+      --wandb_project=rl-laplacian\
       --eval_video=True
 done
