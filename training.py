@@ -192,12 +192,14 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
         # options = create_primitive_options(env)
 
         if n_eigenoptions > 0:
-            pass
             # eigenoptions = create_eigenoptions(env, n_eigenoptions, discount)
             # options.update(eigenoptions)
-
-            # base_env = get_env(env.name.split("_with_vases")[0], _max_steps=max_steps, diffusion=diffusion)
-            # eigenoptions = create_eigenoptions(base_env, n_eigenoptions, discount)
+            
+            base_env = get_env(env.name.split("_with_vases")[0], _max_steps=max_steps, diffusion=diffusion)
+            eigenoptions = create_eigenoptions(base_env, n_eigenoptions, discount)
+            term_states_idx = list(eigenoptions.values())[0].termination_set
+            term_states = [base_env.idx_to_state[term_state_idx] for term_state_idx in term_states_idx]
+            print(f'Terminal states: {term_states}')
 
             #print("Plotting options...")
             #from create_gridworld_options import plot_option
@@ -209,13 +211,10 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
 
             #print("Done.")
 
-        agent = QLearningAgent(n_actions=len(list(options.keys())),
-                               learning_rate=learning_rate,
-                               discount=discount)
+        agent = QLearningAgent(n_actions=env.action_space.n, learning_rate=learning_rate, discount=discount)
 
         # stats = run_loop_fixed_options(agent, env, options=options,
         #                                n_episodes=n_episodes, anneal=anneal)
-        term_states = 
         stats = run_loop_to_term_state(agent, env, n_episodes, anneal, term_states)
 
     else:

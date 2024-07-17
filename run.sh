@@ -23,5 +23,5 @@ do
       --suffix="" \
       --wandb=True \
       --wandb_project=rl-laplacian\
-      --eval_video=True
+      --eval_video=False
 done
