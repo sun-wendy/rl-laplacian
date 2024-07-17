@@ -52,3 +52,49 @@ def eval_loop_fixed_options(agent, env_name, n_eigenoptions, max_steps, seed) ->
         state_idx = next_state_idx
 
     return np.array(frames).astype(np.uint8)
+
+
+def eval_loop(agent, env_name, n_eigenoptions, max_steps, seed) -> (
+        np.ndarray):
+    """Evaluate an agent"""
+
+    np.random.seed(seed)
+    env = get_env(env_name=env_name, _max_steps=max_steps)
+
+    if n_eigenoptions > 0:
+        # eigenoptions = create_eigenoptions(env, n_eigenoptions, discount)
+        # options.update(eigenoptions)
+
+        base_env = get_env(env.name.split("_with_vases")[0],
+                           _max_steps=max_steps, diffusion='normalised')
+        eigenoptions = create_eigenoptions(base_env, n_eigenoptions, agent.discount)
+        term_states_idx = list(eigenoptions.values())[0].termination_set
+        term_states = [base_env.idx_to_state[term_state_idx] for term_state_idx in term_states_idx]
+        print(f'Terminal states: {term_states}')
+
+    else:
+        term_states = [(1, 6), (6, 1)]
+
+    frames = []
+
+    state_idx, info = env.reset()
+    done = False
+    total_steps = 0
+
+    frames.append(env.render_frame())
+    while not done and total_steps < env._max_steps:
+
+        action = agent.choose_action(state_idx)
+
+        next_state_idx, _, done, _, _ = env.step(action)
+        state_idx = next_state_idx
+
+        frames.append(env.render_frame())
+        total_steps += 1
+
+        x, y, _ = env.idx_to_state[state_idx]
+        if (x,y) in term_states:
+            done = True
+
+
+    return np.array(frames).astype(np.uint8)

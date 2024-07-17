@@ -2,6 +2,7 @@
 # character denotes an available state. Each has a comment with a number
 # reference as to where it comes from.
 import os
+import itertools
 import numpy as np
 from enum import IntEnum
 from typing import Optional, List, Tuple
@@ -121,15 +122,7 @@ class Actions(IntEnum):
 
 
 class GridWorldWithVases(Env):
-    """
-    NOTE: PVF functions are not working yet! Don't try to create eigenoptions
-    ==============
-    Related Papers
-    ==============
-
-        https://arxiv.org/pdf/1703.00956.pdf - A Laplacian Framework for Option Discovery in Reinforcement Learning
-        https://arxiv.org/pdf/1810.04586.pdf - The Laplacian in RL: Learning Representations with Efficient Approximations
-    """
+    """Simple gridworld with vases"""
 
     def __init__(self, grid, goal_coords=(11, 11), agent_start_coords=(1, 1), 
                 _max_steps=100, vase_coords: Optional[List[Tuple[int]]] = []):
@@ -137,8 +130,6 @@ class GridWorldWithVases(Env):
         self.vase_coords = vase_coords
         self.broken_vase_coords = []
         self._grid = self.get_grid(grid)
-
-        ### START OF NEW CODE ###
 
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.Discrete(np.sum(self._grid == 1))
@@ -152,8 +143,10 @@ class GridWorldWithVases(Env):
         state_num = 0
         for coords in zip(*np.where(self._grid)):
             if self._grid[coords] == 1:
-                for n_broken_vases in range(len(vase_coords)+1):
-                    self.state_to_idx[(*coords, n_broken_vases)] = state_num
+                for broken_vases in itertools.product([0, 1], repeat=len(vase_coords)):
+                    # broken_vases is a tuple of length :vase_coords:
+                    # broken_vases[i] is 0 if (and only if) the vase at vase_coords[i] is not broken
+                    self.state_to_idx[(*coords, broken_vases)] = state_num
                     state_num += 1
 
         self.idx_to_state = {v: k for k, v in self.state_to_idx.items()}
@@ -175,7 +168,7 @@ class GridWorldWithVases(Env):
     def reset(self):
         self.episode_steps = 0
         self.broken_vase_coords = []
-        state_idx = self.state_to_idx[(*self.agent_start_coords, 0)]
+        state_idx = self.state_to_idx[(*self.agent_start_coords, tuple([0]*len(self.vase_coords)))]
         self.agent_state = self.idx_to_state[state_idx]
         return state_idx, self.info
 
@@ -197,8 +190,15 @@ class GridWorldWithVases(Env):
                 # Check if an agent has stepped in a square with a vase
                 if (next_state_coords in self.vase_coords and
                         next_state_coords not in self.broken_vase_coords):
-                    self.agent_state = (*next_state_coords, self.agent_state[-1]+1)
+
+                    # Update the broken vases list
+                    broken_vases = list(self.agent_state[-1])
+                    new_broken_vase_idx = self.vase_coords.index(next_state_coords)
+                    broken_vases[new_broken_vase_idx] = 1
                     self.broken_vase_coords.append(next_state_coords)
+
+                    # Update the agent state
+                    self.agent_state = (*next_state_coords, tuple(broken_vases))
                     self.info['hit_vase'] = True
                 else:
                     self.agent_state = (*next_state_coords, self.agent_state[-1])
@@ -220,8 +220,6 @@ class GridWorldWithVases(Env):
 
         # next_state, reward, done, truncation, info
         return next_state_idx, reward, done, truncation, self.info
-
-        ### END OF NEW CODE ###
 
     def get_grid(self, name):
         if name not in globals():

@@ -50,12 +50,10 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states):
         total_steps = 0
         n_broken_vases = 0
         state_idx, info = env.reset()
-        #print(f'Start state: {env.idx_to_state[state_idx]}, index {state_idx}')
         done = False
 
         while not done and total_steps < env._max_steps:
             action_idx = agent.choose_action(state_idx)
-            #print('Action: ', action)
 
             next_state_idx, reward, done, truncated, info = env.step(action_idx)
             n_broken_vases += int(info["hit_vase"])
@@ -65,10 +63,11 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states):
 
             state_idx = next_state_idx
             state_coords = env.idx_to_state[state_idx][:2]
+
             if state_coords in term_states:
                 reward += 1
                 done = True
-            
+
             return_ += np.power(agent.discount, total_steps) * reward
 
         stats['return'][episode] = return_
@@ -201,15 +200,9 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
             term_states = [base_env.idx_to_state[term_state_idx] for term_state_idx in term_states_idx]
             print(f'Terminal states: {term_states}')
 
-            #print("Plotting options...")
-            #from create_gridworld_options import plot_option
-
-            #for name, eig_option in eigenoptions.items():
-
-            #    plot_option(env, eig_option, f'figures/option_plots'
-            #                              f'/{env_name}_diffusion_{diffusion}_{name}')
-
-            #print("Done.")
+        else:
+            term_states = [(1, 6), (6, 1)]
+            # hard-code terminal states to top hallway
 
         agent = QLearningAgent(n_actions=env.action_space.n, learning_rate=learning_rate, discount=discount)
 

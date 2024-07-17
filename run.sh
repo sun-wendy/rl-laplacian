@@ -15,13 +15,13 @@ do
       --max_steps=100 \
       --seed=$seed \
       --agent_class="QLearningAgent" \
-      --n_eigenoptions=8 \
+      --n_eigenoptions=0 \
       --diffusion="None" \
       --discount=0.9 \
       --mode=save \
       --log_dir=./logs/$current_datetime \
-      --suffix="" \
+      --suffix="top_hway_test" \
       --wandb=True \
-      --wandb_project=rl-laplacian\
-      --eval_video=False
+      --wandb_project=learn-safe-options\
+      --eval_video=True
 done

@@ -112,17 +112,15 @@ def run_experiment(args):
         _agent.epsilon = 0   # Sample greedily from the agent's policy
 
         # frames dimensions are (time, width, height, channel)
-        frames = evaluation.eval_loop_fixed_options(_agent, args.env_name,
-                                                    max_steps=args.max_steps,
-                                                    n_eigenoptions=args.n_eigenoptions,
-                                                    seed=args.seed)
+        frames = evaluation.eval_loop(_agent, args.env_name, args.n_eigenoptions,
+                                      max_steps=args.max_steps,
+                                      seed=args.seed)
 
     # This python script is run :n: times, with the exact same arguments except for
     # the seeds. To visualize the mean and variance across runs, we use the same
     # group for each run, and distinguish the runs within a group by their seeds
     if args.agent_class == QLearningAgent:
-        group_name = (f'{args.env_name}_{args.suffix}_{args.n_eigenoptions}_eigenoptions'
-                      f'_diffusion_{args.diffusion}')
+        group_name = f'{args.env_name}_{args.suffix}'
 
 
     # Print stats
