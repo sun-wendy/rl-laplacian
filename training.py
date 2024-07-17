@@ -29,10 +29,57 @@ def get_env(env_name: str, _max_steps: int, diffusion='normalised'):
         else:
             raise NotImplementedError
 
-        env = GridWorldWithVases(grid=grid_name, diffusion=diffusion,
-                                 _max_steps=_max_steps, vase_coords=vase_coords)
+        env = GridWorldWithVases(grid=grid_name, _max_steps=_max_steps, vase_coords=vase_coords)
 
     return env
+
+
+def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states):
+    """Training an agent to select fixed options."""
+    stats = {'return': np.zeros(n_episodes),
+             'exploration_rate': np.zeros(n_episodes),
+             'total_steps': np.zeros(n_episodes),
+             'n_broken_vases': np.zeros(n_episodes)}
+
+    if anneal:
+        agent.epsilon = 1.0
+        eps_unit = 1.0 / n_episodes
+
+    for episode in tqdm(range(n_episodes)):
+        return_ = 0
+        total_steps = 0
+        n_broken_vases = 0
+        state_idx, info = env.reset()
+        #print(f'Start state: {env.idx_to_state[state_idx]}, index {state_idx}')
+        done = False
+
+        while not done and total_steps < env._max_steps:
+            action_idx = agent.choose_action(state_idx)
+            #print('Action: ', action)
+
+            next_state_idx, reward, done, truncated, info = env.step(action_idx)
+            n_broken_vases += int(info["hit_vase"])
+            total_steps += 1
+
+            agent.update(state_idx, action_idx, reward, next_state_idx, done)
+
+            state_idx = next_state_idx
+            state_coords = env.idx_to_state[state_idx][:2]
+            if state_coords in term_states:
+                reward += 1
+                done = True
+            
+            return_ += np.power(agent.discount, total_steps) * reward
+
+        stats['return'][episode] = return_
+        stats['total_steps'][episode] = total_steps
+        stats['n_broken_vases'][episode] = n_broken_vases
+        stats['exploration_rate'][episode] = agent.epsilon
+
+        if anneal:
+            agent.epsilon = max(0, agent.epsilon - eps_unit)
+
+    return stats
 
 
 def run_loop_fixed_options(agent, env, options, n_episodes, anneal):
@@ -137,16 +184,20 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
         agent: trained agent
     """
     np.random.seed(seed)
-    env = get_env(env_name=env_name, _max_steps=max_steps, diffusion=diffusion)
+    env = get_env(env_name=env_name, _max_steps=max_steps)
 
     if agent_class == QLearningAgent:
 
         # Create four primitive options for each of the base actions
-        options = create_primitive_options(env)
+        # options = create_primitive_options(env)
 
         if n_eigenoptions > 0:
-            eigenoptions = create_eigenoptions(env, n_eigenoptions, discount)
-            options.update(eigenoptions)
+            pass
+            # eigenoptions = create_eigenoptions(env, n_eigenoptions, discount)
+            # options.update(eigenoptions)
+
+            # base_env = get_env(env.name.split("_with_vases")[0], _max_steps=max_steps, diffusion=diffusion)
+            # eigenoptions = create_eigenoptions(base_env, n_eigenoptions, discount)
 
             #print("Plotting options...")
             #from create_gridworld_options import plot_option
@@ -162,8 +213,10 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
                                learning_rate=learning_rate,
                                discount=discount)
 
-        stats = run_loop_fixed_options(agent, env, options=options,
-                                       n_episodes=n_episodes, anneal=anneal)
+        # stats = run_loop_fixed_options(agent, env, options=options,
+        #                                n_episodes=n_episodes, anneal=anneal)
+        term_states = 
+        stats = run_loop_to_term_state(agent, env, n_episodes, anneal, term_states)
 
     else:
         raise ValueError(f'Invalid agent class {agent_class}')
@@ -179,19 +232,19 @@ if __name__ == "__main__":
     discount = 0.9
     env = get_env(env_name, _max_steps=100, diffusion=diffusion)
 
-    options = create_primitive_options(env)
+    # options = create_primitive_options(env)
 
-    if n_eigenoptions > 0:
-        eigenoptions = create_eigenoptions(env, n_eigenoptions, discount=discount)
-        options.update(eigenoptions)
-        from create_gridworld_options import plot_option
+    # if n_eigenoptions > 0:
+    #     eigenoptions = create_eigenoptions(env, n_eigenoptions, discount=discount)
+    #     options.update(eigenoptions)
+    #     from create_gridworld_options import plot_option
 
-        for name, option in options.items():
-            if 'pvf' not in name:
-                continue
+    #     for name, option in options.items():
+    #         if 'pvf' not in name:
+    #             continue
 
-            plot_option(env, option, f'figures/option_plots/{env_name}/diffusion_'
-                                     f'{diffusion}/{env_name}_diffusion_{diffusion}_{name}')
+    #         plot_option(env, option, f'figures/option_plots/{env_name}/diffusion_'
+    #                                  f'{diffusion}/{env_name}_diffusion_{diffusion}_{name}')
 
 
     import matplotlib.pyplot as plt
@@ -209,4 +262,3 @@ if __name__ == "__main__":
         plt.axis('off')
         plt.savefig(f'figures/step_{i}.png', dpi=400)
         plt.close()
-

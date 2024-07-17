@@ -15,7 +15,7 @@ do
       --max_steps=100 \
       --seed=$seed \
       --agent_class="QLearningAgent" \
-      --n_eigenoptions=3 \
+      --n_eigenoptions=8 \
       --diffusion="None" \
       --discount=0.9 \
       --mode=save \
