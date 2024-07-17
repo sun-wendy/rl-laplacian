@@ -20,7 +20,8 @@ do
       --discount=0.9 \
       --mode=save \
       --log_dir=./logs/$current_datetime \
-      --suffix="top_hway_test" \
+      --suffix="top_hway_broken_vase_dip" \
+      --penalty_strength = 0.1 \
       --wandb=True \
       --wandb_project=learn-safe-options\
       --eval_video=True

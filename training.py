@@ -10,7 +10,7 @@ from agent import QLearningAgent
 from gridworld import Actions, GridWorld
 from gridworld_with_vases import GridWorldWithVases
 from create_gridworld_options import create_primitive_options, create_eigenoptions
-
+import distance_impact_penalties as dip
 
 def get_env(env_name: str, _max_steps: int, diffusion='normalised'):
     """Get a copy of the environment"""
@@ -34,12 +34,14 @@ def get_env(env_name: str, _max_steps: int, diffusion='normalised'):
     return env
 
 
-def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states):
+def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states, penalty_strength):
     """Training an agent to select fixed options."""
     stats = {'return': np.zeros(n_episodes),
              'exploration_rate': np.zeros(n_episodes),
              'total_steps': np.zeros(n_episodes),
              'n_broken_vases': np.zeros(n_episodes)}
+
+    di_penalty = dip.BrokenVaseDistance(env)
 
     if anneal:
         agent.epsilon = 1.0
@@ -58,6 +60,8 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states):
             next_state_idx, reward, done, truncated, info = env.step(action_idx)
             n_broken_vases += int(info["hit_vase"])
             total_steps += 1
+
+            penalty = di_penalty.calculate(state_idx, action_idx, next_state_idx)
 
             agent.update(state_idx, action_idx, reward, next_state_idx, done)
 
@@ -160,7 +164,7 @@ def run_loop_fixed_options(agent, env, options, n_episodes, anneal):
 
 
 def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
-              diffusion, max_steps, agent_class, n_eigenoptions):
+              diffusion, max_steps, agent_class, n_eigenoptions, penalty_strength=0):
     """Run agent
 
     Create an agent with the given parameters for the side effects penalty.
@@ -208,7 +212,7 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
 
         # stats = run_loop_fixed_options(agent, env, options=options,
         #                                n_episodes=n_episodes, anneal=anneal)
-        stats = run_loop_to_term_state(agent, env, n_episodes, anneal, term_states)
+        stats = run_loop_to_term_state(agent, env, n_episodes, anneal, term_states, penalty_strength=penalty_strength)
 
     else:
         raise ValueError(f'Invalid agent class {agent_class}')

@@ -38,6 +38,8 @@ class Args:
                                  help='Diffusion type for environment.')
         self.parser.add_argument('--max_steps', type=int, default=5_000,
                                  help='Maximum number of steps per episode.')
+        self.parser.add_argument('--penalty_strength', type=float, default=0.1,
+                                 help='Strength of the penalty')
         # Settings for outputting results
         self.parser.add_argument('--mode', type=str, default='none',
                                  choices=['print', 'save', 'none'],
@@ -104,7 +106,8 @@ def run_experiment(args):
         env_name=args.env_name,
         diffusion=args.diffusion,
         max_steps=args.max_steps,
-        n_eigenoptions=args.n_eigenoptions)
+        n_eigenoptions=args.n_eigenoptions,
+        penalty_strength=args.penalty_strength)
 
     # Save a video of the agent in the environment
     frames = []
