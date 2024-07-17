@@ -30,3 +30,18 @@ class BrokenVaseDistance(DistanceImpactPenalty):
 
         return abs(sum(self.env.idx_to_state[state_2][-1]) -
                    sum(self.env.idx_to_state[state_1][-1]))
+
+
+class HardcodedFreqDistance(DistanceImpactPenalty):
+    """Masks the state diff vector w/ an importance mask"""
+    def __init__(self, env):
+        super().__init__(env)
+    
+    def distance(self, state_1: int, state_2: int):
+        state_1, state_2 = self.env.idx_to_state[state_1], self.env.idx_to_state[state_2]
+        importance_mask = np.array([0, 0, 1, 1, 1, 1, 1, 1, 1, 1])
+        state_1_arr = np.array([state_1[0], state_1[1]] + list(state_1[2]))
+        state_2_arr = np.array([state_2[0], state_2[1]] + list(state_2[2]))
+        state_diff = state_2_arr - state_1_arr
+        assert len(state_diff) == len(importance_mask)
+        return abs(np.dot(state_diff, importance_mask))

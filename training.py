@@ -39,9 +39,11 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states, penalty_
     stats = {'return': np.zeros(n_episodes),
              'exploration_rate': np.zeros(n_episodes),
              'total_steps': np.zeros(n_episodes),
-             'n_broken_vases': np.zeros(n_episodes)}
+             'n_broken_vases': np.zeros(n_episodes),
+             'penalty': np.zeros(n_episodes)}
 
-    di_penalty = dip.BrokenVaseDistance(env)
+    # di_penalty = dip.BrokenVaseDistance(env)
+    di_penalty = dip.HardcodedFreqDistance(env)
 
     if anneal:
         agent.epsilon = 1.0
@@ -53,6 +55,7 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states, penalty_
         n_broken_vases = 0
         state_idx, info = env.reset()
         done = False
+        total_penalty = 0.0
 
         while not done and total_steps < env._max_steps:
             action_idx = agent.choose_action(state_idx)
@@ -61,16 +64,18 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states, penalty_
             n_broken_vases += int(info["hit_vase"])
             total_steps += 1
 
-            penalty = di_penalty.calculate(state_idx, action_idx, next_state_idx)
-
-            agent.update(state_idx, action_idx, reward, next_state_idx, done)
-
-            state_idx = next_state_idx
-            state_coords = env.idx_to_state[state_idx][:2]
+            state_coords = env.idx_to_state[next_state_idx][:2]
 
             if state_coords in term_states:
                 reward += 1
                 done = True
+
+            penalty = di_penalty.calculate(state_idx, action_idx, next_state_idx)
+            total_penalty += penalty
+            reward -= penalty_strength * penalty
+            agent.update(state_idx, action_idx, reward, next_state_idx, done)
+
+            state_idx = next_state_idx
 
             return_ += np.power(agent.discount, total_steps) * reward
 
@@ -78,6 +83,7 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states, penalty_
         stats['total_steps'][episode] = total_steps
         stats['n_broken_vases'][episode] = n_broken_vases
         stats['exploration_rate'][episode] = agent.epsilon
+        stats['penalty'][episode] = total_penalty
 
         if anneal:
             agent.epsilon = max(0, agent.epsilon - eps_unit)
@@ -164,7 +170,7 @@ def run_loop_fixed_options(agent, env, options, n_episodes, anneal):
 
 
 def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
-              diffusion, max_steps, agent_class, n_eigenoptions, penalty_strength=0):
+              diffusion, max_steps, agent_class, n_eigenoptions, penalty_strength):
     """Run agent
 
     Create an agent with the given parameters for the side effects penalty.
