@@ -2,7 +2,7 @@ from typing import List, Tuple, Dict, Optional, Union
 from enum import IntEnum
 from option import Option
 # from safe_option import SafeOption
-from gridworld import GridWorld, Actions
+from env.gridworld import GridWorld, Actions
 import numpy as np
 import matplotlib.pyplot as plt
 

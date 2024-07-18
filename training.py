@@ -7,8 +7,8 @@ from tqdm import tqdm
 import numpy as np
 import itertools
 from agent import QLearningAgent
-from gridworld import Actions, GridWorld
-from gridworld_with_vases import GridWorldWithVases
+from env.gridworld import Actions, GridWorld
+from env.gridworld_with_vases import GridWorldWithVases
 from create_gridworld_options import create_primitive_options, create_eigenoptions
 import distance_impact_penalties as dip
 
@@ -24,8 +24,7 @@ def get_env(env_name: str, _max_steps: int, diffusion='normalised'):
         grid_name = env_name.split("_with_vases")[0]
 
         if grid_name == 'four_rooms_alt':
-            vase_coords = [(1, 3), (1, 9), (3, 1), (9, 1), (11, 3), (11, 9), (9, 11),
-                           (3, 11)]
+            vase_coords = [(1, 3), (1, 9), (3, 1), (9, 1), (11, 3), (11, 9), (9, 11), (3, 11)]
         else:
             raise NotImplementedError
 
