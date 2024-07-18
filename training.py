@@ -34,7 +34,7 @@ def get_env(env_name: str, _max_steps: int, diffusion='normalised'):
     return env
 
 
-def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states, penalty_strength):
+def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states_abstracted, term_states, penalty_strength):
     """Training an agent to select fixed options."""
     stats = {'return': np.zeros(n_episodes),
              'exploration_rate': np.zeros(n_episodes),
@@ -42,8 +42,7 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states, penalty_
              'n_broken_vases': np.zeros(n_episodes),
              'penalty': np.zeros(n_episodes)}
 
-    # di_penalty = dip.BrokenVaseDistance(env)
-    di_penalty = dip.HardcodedFreqDistance(env)
+    di_penalty = dip.ImportanceDistance(env)
 
     if anneal:
         agent.epsilon = 1.0
@@ -59,24 +58,20 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states, penalty_
 
         while not done and total_steps < env._max_steps:
             action_idx = agent.choose_action(state_idx)
-
             next_state_idx, reward, done, truncated, info = env.step(action_idx)
             n_broken_vases += int(info["hit_vase"])
             total_steps += 1
-
             state_coords = env.idx_to_state[next_state_idx][:2]
 
-            if state_coords in term_states:
+            if state_coords in term_states_abstracted:
                 reward += 1
                 done = True
 
-            penalty = di_penalty.calculate(state_idx, action_idx, next_state_idx)
+            penalty = di_penalty.calculate(state_idx, next_state_idx, term_states_abstracted, term_states)
             total_penalty += penalty
-            reward -= penalty_strength * penalty
+            reward -= penalty
             agent.update(state_idx, action_idx, reward, next_state_idx, done)
-
             state_idx = next_state_idx
-
             return_ += np.power(agent.discount, total_steps) * reward
 
         stats['return'][episode] = return_
@@ -207,18 +202,16 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
             base_env = get_env(env.name.split("_with_vases")[0], _max_steps=max_steps, diffusion=diffusion)
             eigenoptions = create_eigenoptions(base_env, n_eigenoptions, discount)
             term_states_idx = list(eigenoptions.values())[0].termination_set
-            term_states = [base_env.idx_to_state[term_state_idx] for term_state_idx in term_states_idx]
-            print(f'Terminal states: {term_states}')
+            term_states_abstracted = [base_env.idx_to_state[term_state_idx] for term_state_idx in term_states_idx]
 
         else:
-            term_states = [(1, 6), (6, 1)]
+            term_states_abstracted = [(1, 6), (6, 1)]
             # hard-code terminal states to top hallway
 
         agent = QLearningAgent(n_actions=env.action_space.n, learning_rate=learning_rate, discount=discount)
-
-        # stats = run_loop_fixed_options(agent, env, options=options,
-        #                                n_episodes=n_episodes, anneal=anneal)
-        stats = run_loop_to_term_state(agent, env, n_episodes, anneal, term_states, penalty_strength=penalty_strength)
+        term_states = env.term_states
+        # stats = run_loop_fixed_options(agent, env, options=options, n_episodes=n_episodes, anneal=anneal)
+        stats = run_loop_to_term_state(agent, env, n_episodes, anneal, term_states_abstracted, term_states, penalty_strength)
 
     else:
         raise ValueError(f'Invalid agent class {agent_class}')
@@ -256,7 +249,6 @@ if __name__ == "__main__":
     for i in range(20):
         action = env.action_space.sample()
         next_state_idx, reward, done, truncated, info = env.step(action)
-        print(env.idx_to_state[next_state_idx])
         state_idx = next_state_idx
 
         frame = env.render_frame()

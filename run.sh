@@ -21,7 +21,7 @@ do
       --mode=save \
       --log_dir=./logs/$current_datetime \
       --suffix="top_hway_broken_vase_dip" \
-      --penalty_strength=1.0 \
+      --penalty_strength=0.25 \
       --wandb=True \
       --wandb_project=learn-safe-options\
       --eval_video=True

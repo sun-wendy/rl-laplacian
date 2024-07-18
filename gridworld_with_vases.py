@@ -130,10 +130,8 @@ class GridWorldWithVases(Env):
         self.vase_coords = vase_coords
         self.broken_vase_coords = []
         self._grid = self.get_grid(grid)
-
         self.action_space = spaces.Discrete(4)
         self.observation_space = spaces.Discrete(np.sum(self._grid == 1))
-
         self.directions = [np.array((1, 0)), np.array((0, 1)), np.array((-1, 0)),
                            np.array((0, -1))]  # down,right,up,left
 
@@ -150,12 +148,13 @@ class GridWorldWithVases(Env):
                     state_num += 1
 
         self.idx_to_state = {v: k for k, v in self.state_to_idx.items()}
+        self.update_freq = np.zeros(2 + len(self.idx_to_state[0][2]))
 
-        assert agent_start_coords != goal_coords, ('agent_start_state and '
-                                                  'goal_statere the same')
+        assert agent_start_coords != goal_coords, ('agent_start_state and goal_statere the same')
         self.agent_start_coords = agent_start_coords
         self.agent_state = None
         self.goal_coords = goal_coords
+        self.term_states = [k for k in self.state_to_idx.keys() if k[0] == goal_coords[0] and k[1] == goal_coords[1]]
 
         self.init_states = list(range(self.observation_space.n))
         #self.init_states.remove(self.goal)
@@ -170,6 +169,7 @@ class GridWorldWithVases(Env):
         self.broken_vase_coords = []
         state_idx = self.state_to_idx[(*self.agent_start_coords, tuple([0]*len(self.vase_coords)))]
         self.agent_state = self.idx_to_state[state_idx]
+        self.update_freq = np.zeros(2 + len(self.idx_to_state[0][2]))
         return state_idx, self.info
 
     def set_goal(self, goal_coords: Tuple[int]):
@@ -181,6 +181,11 @@ class GridWorldWithVases(Env):
         """
         next_state_coords = tuple(np.array((self.agent_state[0],
                                    self.agent_state[1])) + self.directions[action])
+        
+        if next_state_coords[0] != self.agent_state[0]:
+            self.update_freq[0] += 1
+        if next_state_coords[1] != self.agent_state[1]:
+            self.update_freq[1] += 1
 
         # Check if we can move to the next cell
         try:
@@ -200,6 +205,7 @@ class GridWorldWithVases(Env):
                     # Update the agent state
                     self.agent_state = (*next_state_coords, tuple(broken_vases))
                     self.info['hit_vase'] = True
+                    self.update_freq[new_broken_vase_idx+2] += 1
                 else:
                     self.agent_state = (*next_state_coords, self.agent_state[-1])
 
