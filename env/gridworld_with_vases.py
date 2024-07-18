@@ -154,8 +154,7 @@ class GridWorldWithVases(Env):
         self.agent_start_coords = agent_start_coords
         self.agent_state = None
         self.goal_coords = goal_coords
-        self.term_states = [k for k in self.state_to_idx.keys() if k[0] == goal_coords[0] and k[1] == goal_coords[1]]
-
+        self.term_states = [k for k, v in self.idx_to_state.items() if v[0] == goal_coords[0] and v[1] == goal_coords[1]]
         self.init_states = list(range(self.observation_space.n))
         #self.init_states.remove(self.goal)
         self.first = True
