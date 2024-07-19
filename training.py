@@ -188,8 +188,9 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
             eigenoptions = create_eigenoptions(base_env, n_eigenoptions, discount)
             term_states_idx = list(eigenoptions.values())[0].termination_set
         else:
-            term_states_idx = env.term_states
-        
+            term_states = [(2, 5, (0, 0, 0, 0, 0, 0, 0, 0)), (5, 2, (0, 0, 0, 0, 0, 0, 0, 0))]
+            term_states_idx = [env.state_to_idx[state] for state in term_states]
+
         agent = QLearningAgent(n_actions=env.action_space.n, learning_rate=learning_rate, discount=discount)
         # stats = run_loop_fixed_options(agent, env, options=options, n_episodes=n_episodes, anneal=anneal)
         stats = run_loop_to_term_state(agent, env, n_episodes, anneal, term_states_idx)
