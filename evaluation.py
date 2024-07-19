@@ -73,7 +73,7 @@ def eval_loop(agent, env_name, n_eigenoptions, max_steps, seed) -> (
         print(f'Terminal states: {term_states}')
 
     else:
-        term_states = [(1, 6), (6, 1)]
+        term_states = [(2, 5), (5, 2)]
 
     frames = []
 
