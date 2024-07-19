@@ -18,9 +18,9 @@ do
       --n_eigenoptions=0 \
       --diffusion="None" \
       --discount=0.9 \
-      --mode=save \
+      --mode=none \
       --log_dir=./logs/$current_datetime \
-      --suffix="top_hway_broken_vase_dip" \
+      --suffix="reach_regul_1,6_penalty_strength_0.25_init_prob_0" \
       --penalty_strength=0.25 \
       --wandb=True \
       --wandb_project=learn-safe-options\

@@ -32,15 +32,28 @@ def get_env(env_name: str, _max_steps: int, diffusion='normalised'):
     return env
 
 
-def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states_idx):
+def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states_idx,
+                           penalty_strength):
     """Training an agent to select fixed options."""
     stats = {'return': np.zeros(n_episodes),
              'exploration_rate': np.zeros(n_episodes),
+             'penalty_strength': np.zeros(n_episodes),
              'total_steps': np.zeros(n_episodes),
              'n_broken_vases': np.zeros(n_episodes),
-             'penalty': np.zeros(n_episodes)}
+             'penalty': np.zeros(n_episodes),
+             'reach_prob_from_init_state': np.zeros(n_episodes)}
 
-    di_penalty = dip.ImportanceDistance(env)
+    initial_state_idx, _ = env.reset()
+    di_penalty = dip.ImportanceDistance(env, initial_state_idx, term_states_idx,
+                                        discount=agent.discount,
+                                        learning_rate=agent.learning_rate,
+                                        init_reach_prob=0.0)
+
+    print("Initial probs: ", di_penalty.reach_estimator.predict(
+        initial_state_idx))
+
+    term_state_coords = [(env.idx_to_state[t][0], env.idx_to_state[t][1]) for t
+                         in term_states_idx]
 
     if anneal:
         agent.epsilon = 1.0
@@ -53,24 +66,25 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states_idx):
         state_idx, info = env.reset()
         done = False
         total_penalty = 0.0
-        start_state_idx = state_idx
-        ideal_state_arr = di_penalty.get_ideal_state(start_state_idx, term_states_idx)
-        term_coords = [(env.idx_to_state[idx][0], env.idx_to_state[idx][1]) for idx in term_states_idx]
 
         while not done and total_steps < env._max_steps:
             action_idx = agent.choose_action(state_idx)
             next_state_idx, reward, done, truncated, info = env.step(action_idx)
             n_broken_vases += int(info["hit_vase"])
             total_steps += 1
-            state_coords = env.idx_to_state[next_state_idx][:2]
 
-            if state_coords in term_coords:
+            next_state_coords = env.idx_to_state[next_state_idx][:2]
+            if next_state_coords in term_state_coords:
                 reward += 1
                 done = True
 
-            penalty = di_penalty.calculate(state_idx, next_state_idx, start_state_idx, ideal_state_arr)
+            # Update the penalty
+            di_penalty.reach_estimator.update(state_idx, action_idx, next_state_idx)
+            penalty = di_penalty.calculate(state_idx, next_state_idx)
             total_penalty += penalty
-            reward -= penalty
+
+            reward = reward - penalty_strength * penalty
+
             agent.update(state_idx, action_idx, reward, next_state_idx, done)
             state_idx = next_state_idx
             return_ += np.power(agent.discount, total_steps) * reward
@@ -80,6 +94,10 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states_idx):
         stats['n_broken_vases'][episode] = n_broken_vases
         stats['exploration_rate'][episode] = agent.epsilon
         stats['penalty'][episode] = total_penalty
+        stats['penalty_strength'][episode] = penalty_strength
+        stats['reach_prob_from_init_state'][episode] = (
+            di_penalty.reach_estimator.predict(
+                initial_state_idx))[agent.choose_action(initial_state_idx)]
 
         if anneal:
             agent.epsilon = max(0, agent.epsilon - eps_unit)
@@ -188,12 +206,13 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
             eigenoptions = create_eigenoptions(base_env, n_eigenoptions, discount)
             term_states_idx = list(eigenoptions.values())[0].termination_set
         else:
-            term_states = [(2, 5, (0, 0, 0, 0, 0, 0, 0, 0)), (5, 2, (0, 0, 0, 0, 0, 0, 0, 0))]
+            term_states = [(1, 6, (0, 0, 0, 0, 0, 0, 0, 0)), (6, 1, (0, 0, 0, 0, 0, 0, 0, 0))]
             term_states_idx = [env.state_to_idx[state] for state in term_states]
 
         agent = QLearningAgent(n_actions=env.action_space.n, learning_rate=learning_rate, discount=discount)
         # stats = run_loop_fixed_options(agent, env, options=options, n_episodes=n_episodes, anneal=anneal)
-        stats = run_loop_to_term_state(agent, env, n_episodes, anneal, term_states_idx)
+        stats = run_loop_to_term_state(agent, env, n_episodes, anneal,
+                                       term_states_idx, penalty_strength)
 
     else:
         raise ValueError(f'Invalid agent class {agent_class}')

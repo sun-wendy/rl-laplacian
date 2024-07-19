@@ -95,7 +95,6 @@ def str2agentclass(v):
 
 def run_experiment(args):
     """Run agent and save or print the results."""
-
     stats, _agent = training.run_agent(
         agent_class=args.agent_class,
         learning_rate=args.learning_rate,
