@@ -75,50 +75,44 @@ class ImportanceDistance(DistanceImpactPenalty):
                                                      discount=discount,
                                                      learning_rate=learning_rate)
 
-    def get_ideal_state(self, start_state: int, term_states_idx: list) -> int:
-        """Summarize what the ideal (intermediate) terminal state should be for
-        the current option. Return the index of the ideal state"""
+    def get_ideal_state(self, start_state: int, term_states_idx: list):
+        """Summarize what the ideal (intermediate) terminal state should be for the current option"""
+
         def flatten_tuple(t):
             flattened_list = []
+
             def recursive_flatten(x):
                 if isinstance(x, tuple):
                     for y in x:
                         recursive_flatten(y)
                 else:
                     flattened_list.append(x)
+
             recursive_flatten(t)
             return flattened_list
 
-        flatten_state = lambda state: list((state[0], state[1], *state[2]))
-        print(flatten_state(self.env.idx_to_state[start_state]))
-
         ideal_state = []
-        start_state_flattened = flatten_tuple(self.env.idx_to_state[start_state])
+        start_state = self.env.idx_to_state[start_state]
+        start_state = ((start_state[0], start_state[1]), start_state[2])
         term_states = [self.env.idx_to_state[idx] for idx in term_states_idx]
-        print("Initial state idx: ", start_state)
-        print("Term state idxs: ", term_states_idx)
+        term_states = [((term_state[0], term_state[1]), term_state[2]) for term_state in term_states]
 
-        for i, start_state_var in enumerate(start_state_flattened):
+        for i, start_state_var in enumerate(start_state):
+            print("Start var: ", start_state_var)
             var_ever_match = False
             for term_state in term_states:
-                term_state_flattened = flatten_tuple(term_state)
-                if start_state_var == term_state_flattened[i]:
+                if start_state_var == term_state[i]:
                     var_ever_match = True
                     break
             if var_ever_match:
                 ideal_state.append(start_state_var)
             else:
-                print('='*80)
-                print("in else statement")
-                ideal_state.append(flatten_tuple(term_states[0])[i])  # TODO: Assuming a single ideal state, need to relax this later
+                ideal_state.append(term_states[0][i])  # TODO: Assuming a single ideal state, need to relax this later
 
-        # convert the ideal state
-        x = ideal_state[0]
-        y = ideal_state[1]
-        vase_info = ideal_state[2:]
-        ideal_state_idx = self.env.state_to_idx[(x, y, tuple(vase_info))]
+        ideal_state = tuple(ideal_state)
+        ideal_state_idx = self.env.state_to_idx[(ideal_state[0][0], ideal_state[0][1], ideal_state[1])]
 
-        assert ideal_state_idx in term_states_idx, "Ideal state not in term set"
+        assert ideal_state_idx in term_states_idx, "Ideal state not in term states"
 
         return ideal_state_idx
 

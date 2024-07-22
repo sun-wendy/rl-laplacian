@@ -20,8 +20,8 @@ do
       --discount=0.9 \
       --mode=none \
       --log_dir=./logs/$current_datetime \
-      --suffix="reach_regul_1,6_penalty_strength_0.25_init_prob_0" \
-      --penalty_strength=0.25 \
+      --suffix="reach_regul_1,6_penalty_strength_10_init_prob_0" \
+      --penalty_strength=1 \
       --wandb=True \
       --wandb_project=learn-safe-options\
       --eval_video=True
