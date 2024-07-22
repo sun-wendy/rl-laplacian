@@ -52,8 +52,9 @@ class HardcodedDistance(DistanceImpactPenalty):
         return abs(np.dot(state_diff, importance_mask))
 
 
-class ImportanceDistance(DistanceImpactPenalty):
-    """Counts the difference in the number of broken vases between two states"""
+class NonEssentialChangesPenalty(DistanceImpactPenalty):
+    """Penalizes an agent for making changes to state variables which don't have
+    to be changed in order to reach the goal state"""
     def __init__(self, env, start_state_idx: int, term_states_idx: List[int],
                  discount=0.9, learning_rate=0.1, init_reach_prob=1.):
         super().__init__(env)
@@ -102,7 +103,7 @@ class ImportanceDistance(DistanceImpactPenalty):
         return distance
 
 
-class ImportanceDistanceWithReachability(DistanceImpactPenalty):
+class ImportanceDistance(DistanceImpactPenalty):
     """Counts the difference in the number of broken vases between two states"""
     def __init__(self, env, start_state_idx: int, term_states_idx: List[int],
                  discount=0.9, learning_rate=0.1, init_reach_prob=1.):

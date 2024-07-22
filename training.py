@@ -40,20 +40,10 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states_idx,
              'penalty_strength': np.zeros(n_episodes),
              'total_steps': np.zeros(n_episodes),
              'n_broken_vases': np.zeros(n_episodes),
-             'penalty': np.zeros(n_episodes),
-             'reach_prob_from_init_state': np.zeros(n_episodes)}
+             'penalty': np.zeros(n_episodes)}
 
     initial_state_idx, _ = env.reset()
-    di_penalty = dip.ImportanceDistance(env, initial_state_idx, term_states_idx,
-                                        discount=agent.discount,
-                                        learning_rate=agent.learning_rate,
-                                        init_reach_prob=0.0)
-
-    print("Initial probs: ", di_penalty.reach_estimator.predict(
-        initial_state_idx))
-
-    term_state_coords = [(env.idx_to_state[t][0], env.idx_to_state[t][1]) for t
-                         in term_states_idx]
+    di_penalty = dip.NonEssentialChangesPenalty(env, initial_state_idx, term_states_idx)
 
     if anneal:
         agent.epsilon = 1.0
@@ -73,14 +63,14 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states_idx,
             n_broken_vases += int(info["hit_vase"])
             total_steps += 1
 
-            next_state_coords = env.idx_to_state[next_state_idx][:2]
-            if next_state_coords in term_state_coords:
+            if next_state_idx in term_states_idx:
                 reward += 1
                 done = True
 
-            # Update the penalty
-            di_penalty.reach_estimator.update(state_idx, action_idx, next_state_idx)
             penalty = di_penalty.calculate(state_idx, next_state_idx)
+            #print("state: ", env.idx_to_state[state_idx])
+            #print("next state: ", env.idx_to_state[next_state_idx])
+            #print("penalty: ", penalty)
             total_penalty += penalty
 
             reward = reward - penalty_strength * penalty
@@ -95,9 +85,6 @@ def run_loop_to_term_state(agent, env, n_episodes, anneal, term_states_idx,
         stats['exploration_rate'][episode] = agent.epsilon
         stats['penalty'][episode] = total_penalty
         stats['penalty_strength'][episode] = penalty_strength
-        stats['reach_prob_from_init_state'][episode] = (
-            di_penalty.reach_estimator.predict(
-                initial_state_idx))[agent.choose_action(initial_state_idx)]
 
         if anneal:
             agent.epsilon = max(0, agent.epsilon - eps_unit)
@@ -212,11 +199,9 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
             for coords in term_coords:
                 for broken_vases in itertools.product([0, 1], repeat=len(
                         env.vase_coords)):
-                    print((coords, broken_vases))
                     term_states_idx.append(
                         env.state_to_idx[(coords, broken_vases)]
                     )
-        exit()
 
         agent = QLearningAgent(n_actions=env.action_space.n, learning_rate=learning_rate, discount=discount)
         stats = run_loop_to_term_state(agent, env, n_episodes, anneal,
