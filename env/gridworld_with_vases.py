@@ -122,7 +122,7 @@ class Actions(IntEnum):
 
 
 class GridWorldWithVases(Env):
-    """Simple gridworld with vases"""
+    """Simple gridworld with vases. State variables are ((x,y), (vase_info)"""
 
     def __init__(self, grid, goal_coords=(11, 11), agent_start_coords=(1, 1), 
                 _max_steps=100, vase_coords: Optional[List[Tuple[int]]] = []):
@@ -144,17 +144,17 @@ class GridWorldWithVases(Env):
                 for broken_vases in itertools.product([0, 1], repeat=len(vase_coords)):
                     # broken_vases is a tuple of length :vase_coords:
                     # broken_vases[i] is 0 if (and only if) the vase at vase_coords[i] is not broken
-                    self.state_to_idx[(*coords, broken_vases)] = state_num
+                    self.state_to_idx[(coords, broken_vases)] = state_num
                     state_num += 1
 
         self.idx_to_state = {v: k for k, v in self.state_to_idx.items()}
-        self.update_freq = np.zeros(2 + len(self.idx_to_state[0][2]))
+        self.update_freq = np.zeros(1 + len(self.vase_coords))
 
         assert agent_start_coords != goal_coords, ('agent_start_state and goal_statere the same')
         self.agent_start_coords = agent_start_coords
         self.agent_state = None
         self.goal_coords = goal_coords
-        self.term_states = [k for k, v in self.idx_to_state.items() if v[0] == goal_coords[0] and v[1] == goal_coords[1]]
+        self.term_states = [k for k, v in self.idx_to_state.items() if v[0] == goal_coords]
         self.init_states = list(range(self.observation_space.n))
         #self.init_states.remove(self.goal)
         self.first = True
@@ -166,9 +166,9 @@ class GridWorldWithVases(Env):
     def reset(self):
         self.episode_steps = 0
         self.broken_vase_coords = []
-        state_idx = self.state_to_idx[(*self.agent_start_coords, tuple([0]*len(self.vase_coords)))]
+        state_idx = self.state_to_idx[(self.agent_start_coords, tuple([0]*len(self.vase_coords)))]
         self.agent_state = self.idx_to_state[state_idx]
-        self.update_freq = np.zeros(2 + len(self.idx_to_state[0][2]))
+        self.update_freq = np.zeros(1 + len(self.vase_coords))
         return state_idx, self.info
 
     def set_goal(self, goal_coords: Tuple[int]):
@@ -178,13 +178,7 @@ class GridWorldWithVases(Env):
         """
         Take one step in the environment
         """
-        next_state_coords = tuple(np.array((self.agent_state[0],
-                                   self.agent_state[1])) + self.directions[action])
-        
-        if next_state_coords[0] != self.agent_state[0]:
-            self.update_freq[0] += 1
-        if next_state_coords[1] != self.agent_state[1]:
-            self.update_freq[1] += 1
+        next_state_coords = tuple(np.array(self.agent_state[0]) + self.directions[action])
 
         # Check if we can move to the next cell
         try:
@@ -202,11 +196,12 @@ class GridWorldWithVases(Env):
                     self.broken_vase_coords.append(next_state_coords)
 
                     # Update the agent state
-                    self.agent_state = (*next_state_coords, tuple(broken_vases))
+                    self.agent_state = (next_state_coords, tuple(broken_vases))
                     self.info['hit_vase'] = True
-                    self.update_freq[new_broken_vase_idx+2] += 1
+                    self.update_freq[new_broken_vase_idx+1] += 1
+
                 else:
-                    self.agent_state = (*next_state_coords, self.agent_state[-1])
+                    self.agent_state = (next_state_coords, self.agent_state[-1])
 
         except ValueError:
             print("Next State Coords: ", next_state_coords)
@@ -214,14 +209,15 @@ class GridWorldWithVases(Env):
             print("Error!")
             exit(1)
 
+        # Update frequency of position change
+        if next_state_coords != self.agent_state[0]:
+            self.update_freq[0] += 1
+
         next_state_idx = self.state_to_idx[self.agent_state]
-        reward = float((self.agent_state[0], self.agent_state[1]) ==
-                       self.goal_coords)
+        reward = float(self.agent_state[0] == self.goal_coords)
 
-        truncation = False #TODO: fix for option steps self.episode_steps >= self._max_steps
+        truncation = False #TODO: add truncation condition
         done = reward > 0 or truncation
-
-        #self.episode_steps += 1
 
         # next_state, reward, done, truncation, info
         return next_state_idx, reward, done, truncation, self.info
@@ -239,14 +235,14 @@ class GridWorldWithVases(Env):
         return np.pad(grid, 1)
 
     def render_frame(self) -> np.ndarray:
-        """ Renders the environment and returns a frame as a numpy array,
+        """Renders the environment and returns a frame as a numpy array,
         with dimensions (width, height, channel)"""
         frame = np.zeros((self._grid.shape[0], self._grid.shape[1], 3),
                          dtype=np.uint8)
 
         frame[self._grid == 1] = [255, 255, 255]
         frame[self.goal_coords] = [0, 255, 0]
-        frame[(self.agent_state[0], self.agent_state[1])] = [50, 0, 255]
+        frame[self.agent_state[0]] = [50, 0, 255]
         for vase_coords in self.vase_coords:
             if vase_coords in self.broken_vase_coords:
                 continue
