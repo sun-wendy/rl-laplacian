@@ -69,11 +69,12 @@ def eval_loop(agent, env_name, n_eigenoptions, max_steps, seed) -> (
                            _max_steps=max_steps, diffusion='normalised')
         eigenoptions = create_eigenoptions(base_env, n_eigenoptions, agent.discount)
         term_states_idx = list(eigenoptions.values())[0].termination_set
-        term_states = [base_env.idx_to_state[term_state_idx] for term_state_idx in term_states_idx]
-        print(f'Terminal states: {term_states}')
+        term_coords = [base_env.idx_to_state[term_state_idx] for term_state_idx in
+                  term_states_idx]
+        print(f'Terminal states: {term_coords}')
 
     else:
-        term_states = [(1, 6), (6, 1)]
+        term_coords = [(1, 6), (6, 1)]
 
     frames = []
 
@@ -92,9 +93,8 @@ def eval_loop(agent, env_name, n_eigenoptions, max_steps, seed) -> (
         frames.append(env.render_frame())
         total_steps += 1
 
-        x, y, _ = env.idx_to_state[state_idx]
-        if (x,y) in term_states:
+        coords, _ = env.idx_to_state[state_idx]
+        if coords in term_coords:
             done = True
-
 
     return np.array(frames).astype(np.uint8)

@@ -6,7 +6,7 @@ set -x  # for printing commands
 
 current_datetime=$(date '+%Y-%m-%d-%H-%M')
 
-for seed in {1..5}
+for seed in {4..5}
 do
   # Save a video of the agent on the first run
   python3 run_experiment.py \
@@ -20,8 +20,8 @@ do
       --discount=0.9 \
       --mode=none \
       --log_dir=./logs/$current_datetime \
-      --suffix="reach_regul_1,6_penalty_strength_10_init_prob_0" \
-      --penalty_strength=1 \
+      --suffix="non_ess_penalty" \
+      --penalty_strength=0.5 \
       --wandb=True \
       --wandb_project=learn-safe-options\
       --eval_video=True
