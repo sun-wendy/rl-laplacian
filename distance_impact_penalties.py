@@ -59,23 +59,62 @@ class ImportanceDistance(DistanceImpactPenalty):
         super().__init__(env)
         self.start_state_idx = start_state_idx
         self.term_states_idx = term_states_idx
-        print("Start state idx: ", self.start_state_idx)
-        print("End state idx: ", self.term_states_idx)
+        self.n_state_vars = len(self.env.idx_to_state[self.start_state_idx])
+
+        # Find the state variables which need to be changed
+        self.ess_state_vars = self.find_essential_state_vars()
+
+    def find_essential_state_vars(self) -> List[int]:
+        """Find the state variables which have to be changed in order to
+        reach a terminal state (these are the 'essential' state variabeles).
+
+        Return value is a list of indices corresponding to the essential
+        state variables."""
+
+        start_state = self.env.idx_to_state[self.start_state_idx]
+
+        ess_vars = [i for i in range(self.n_state_vars)]
+        for state_var in range(self.n_state_vars):
+            for idx in self.term_states_idx:
+                # Remove i from the essential state variables if it doesn't have
+                # to be changed in one of the terminal states
+                if start_state[state_var] == self.env.idx_to_state[idx][state_var]:
+                    ess_vars.remove(state_var)
+                    break
+
+        print("Essential state variables: ", ess_vars)
+        return ess_vars
+
+    def distance(self, state_1_idx: int, state_2_idx: int):
+        """Penalizes the agent if it makes a change to a non-essential state
+        variable"""
+        state_1 = self.env.idx_to_state[state_1_idx]
+        state_2 = self.env.idx_to_state[state_2_idx]
+        distance = 0
+
+        # Count the number of changes to non-essential state variables
+        for i in range(self.n_state_vars):
+            if i in self.ess_state_vars:
+                continue
+            if state_1[i] != state_2[i]:
+                distance += 1
+
+        return distance
+
+
+class ImportanceDistanceWithReachability(DistanceImpactPenalty):
+    """Counts the difference in the number of broken vases between two states"""
+    def __init__(self, env, start_state_idx: int, term_states_idx: List[int],
+                 discount=0.9, learning_rate=0.1, init_reach_prob=1.):
+        super().__init__(env)
+        self.start_state_idx = start_state_idx
+        self.term_states_idx = term_states_idx
 
         # Find the closest terminal state to the start state
         self.ideal_state_idx = self.get_ideal_state(start_state_idx,
                                                     term_states_idx)
 
-        print("Ideal state idx: ", self.ideal_state_idx)
-
-        # Estimate how reachable the ideal state is
-        self.reach_estimator = ReachabilityEstimator(n_actions=env.action_space.n,
-                                                     goal_state_idxs=[self.ideal_state_idx],
-                                                     init_reach_prob=init_reach_prob,
-                                                     discount=discount,
-                                                     learning_rate=learning_rate)
-
-    def get_ideal_state(self, start_state: int, term_states_idx: list):
+    def get_ideal_state(self, start_state_idx: int, term_states_idx: List[int]):
         """Summarize what the ideal (intermediate) terminal state should be for the current option"""
 
         def flatten_tuple(t):
@@ -92,13 +131,13 @@ class ImportanceDistance(DistanceImpactPenalty):
             return flattened_list
 
         ideal_state = []
-        start_state = self.env.idx_to_state[start_state]
-        start_state = ((start_state[0], start_state[1]), start_state[2])
+        start_state = self.env.idx_to_state[start_state_idx]
+        start_state = (start_state[0], start_state[1])
         term_states = [self.env.idx_to_state[idx] for idx in term_states_idx]
-        term_states = [((term_state[0], term_state[1]), term_state[2]) for term_state in term_states]
+        term_states = [(term_state[0], term_state[1]) for term_state in term_states]
 
         for i, start_state_var in enumerate(start_state):
-            print("Start var: ", start_state_var)
+            #print("Start var: ", start_state_var)
             var_ever_match = False
             for term_state in term_states:
                 if start_state_var == term_state[i]:
@@ -110,7 +149,7 @@ class ImportanceDistance(DistanceImpactPenalty):
                 ideal_state.append(term_states[0][i])  # TODO: Assuming a single ideal state, need to relax this later
 
         ideal_state = tuple(ideal_state)
-        ideal_state_idx = self.env.state_to_idx[(ideal_state[0][0], ideal_state[0][1], ideal_state[1])]
+        ideal_state_idx = self.env.state_to_idx[(ideal_state[0], ideal_state[1])]
 
         assert ideal_state_idx in term_states_idx, "Ideal state not in term states"
 
