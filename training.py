@@ -206,11 +206,19 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
             eigenoptions = create_eigenoptions(base_env, n_eigenoptions, discount)
             term_states_idx = list(eigenoptions.values())[0].termination_set
         else:
-            term_states = [(1, 6, (0, 0, 0, 0, 0, 0, 0, 0)), (6, 1, (0, 0, 0, 0, 0, 0, 0, 0))]
-            term_states_idx = [env.state_to_idx[state] for state in term_states]
+            import itertools
+            term_coords = [(1, 6), (6, 1)]
+            term_states_idx = []
+            for coords in term_coords:
+                for broken_vases in itertools.product([0, 1], repeat=len(
+                        env.vase_coords)):
+                    print((coords, broken_vases))
+                    term_states_idx.append(
+                        env.state_to_idx[(coords, broken_vases)]
+                    )
+        exit()
 
         agent = QLearningAgent(n_actions=env.action_space.n, learning_rate=learning_rate, discount=discount)
-        # stats = run_loop_fixed_options(agent, env, options=options, n_episodes=n_episodes, anneal=anneal)
         stats = run_loop_to_term_state(agent, env, n_episodes, anneal,
                                        term_states_idx, penalty_strength)
 
@@ -218,7 +226,6 @@ def run_agent(learning_rate, discount, anneal, n_episodes, seed, env_name,
         raise ValueError(f'Invalid agent class {agent_class}')
 
     return stats, agent
-
 
 
 if __name__ == "__main__":
